@@ -373,6 +373,12 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 .appsbar{display:flex;justify-content:flex-end;margin:0 0 10px}.apps.org .app{justify-content:flex-start;cursor:grab;outline:2px dashed color-mix(in srgb,var(--navy) 35%,transparent);outline-offset:2px}.apps.org .app.off{opacity:.4}.apps:not(.org) .app.off{display:none}.tctl{order:-1;align-self:stretch;display:flex;justify-content:center;gap:6px;margin:0 0 8px;padding:0 0 8px;border-bottom:1px dashed var(--line)}.tctl span{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:var(--sheet);border:1px solid var(--line);font-size:14px;color:var(--ink)}.apps .app{position:relative}.app.drag{opacity:.5}
 .topacts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;align-self:center;justify-content:flex-end;margin-left:auto}.topacts .btn{height:38px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding-top:0;padding-bottom:0;box-sizing:border-box}@media(max-width:520px){#appsOrg{font-size:0}#appsOrg::before{content:"✎";font-size:15px}}
 .tirfil{display:grid;gap:6px;margin:0 0 12px}.tirfil .tfrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;justify-content:flex-start}.tirfil .lbl{min-width:96px;font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em}.tirfil .chip small{opacity:.7;margin-left:3px}.tirfil .clr{border:0;background:none;color:var(--navy);font:inherit;font-size:12.5px;cursor:pointer;text-decoration:underline}
+.xtabs{display:flex;gap:6px;margin:0 0 14px;padding:4px;background:var(--sheet);border:1px solid var(--line);border-radius:14px;max-width:420px}.xtabs button{flex:1;border:0;background:none;color:var(--ink-2);font:inherit;font-weight:700;font-size:14px;padding:10px;border-radius:10px;cursor:pointer}.xtabs button[aria-selected="true"]{background:var(--navy);color:var(--navy-ink)}
+.stepn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--navy);color:var(--navy-ink);font-size:12px;margin-right:8px;letter-spacing:0}.h2act{margin-left:auto;font-size:12px;font-weight:500;letter-spacing:0;text-transform:none}.linkbtn{border:0;background:none;color:var(--navy);font:inherit;cursor:pointer;padding:0;text-decoration:underline}
+.xtypes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.xtype{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--sheet);color:var(--ink);font:inherit;text-align:left;cursor:pointer}.xtype b{font-size:14px}.xtype small{color:var(--ink-2);font-size:12px}.xtype[aria-pressed="true"]{border-color:var(--navy);background:color-mix(in srgb,var(--navy) 10%,var(--sheet));box-shadow:inset 0 0 0 1px var(--navy)}.xtype[disabled]{opacity:.45;cursor:default}
+.xrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 10px}.xrow .lbl{min-width:110px;font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em}.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden}.seg button{border:0;border-right:1px solid var(--line);background:var(--sheet);color:var(--ink);font:inherit;font-size:13px;padding:7px 12px;cursor:pointer}.seg button:last-child{border-right:0}.seg button[aria-pressed="true"]{background:var(--navy);color:var(--navy-ink)}
+.xgo{position:sticky;bottom:12px;display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:14px}.xgo .btn{background:var(--navy);border-color:var(--navy);color:var(--navy-ink);padding:12px 20px;box-shadow:0 8px 20px -10px var(--navy)}.xgo .btn[disabled]{opacity:.5;box-shadow:none}
+.ximp{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.ximpc{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--sheet);color:var(--ink);font:inherit;text-align:left;cursor:pointer}.ximpc b{font-size:14px}.ximpc span{color:var(--ink-2);font-size:12.5px}.ximpc:hover{border-color:var(--navy)}
 .sug .chip{padding:4px 10px;font-size:12px}.sug .chip.prop{border-style:dashed;font-weight:600}
 .sug .chip small{color:inherit;opacity:.75;margin-left:4px}
 .notegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
@@ -496,8 +502,8 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
       </button>
       <button type="button" class="app" data-app="exp">
         <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></svg></span>
-        <span class="t">Export</span>
-        <span class="d">Le seul endroit pour exporter : par période et par mission, seuls ou en zip.</span>
+        <span class="t">Import / Export</span>
+        <span class="d">Exporter par type, période et mission ; importer fiches, carnet et sauvegardes.</span>
         <span class="s"></span>
       </button>
       <div class="app soon" aria-disabled="true">
@@ -675,17 +681,33 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
   <div class="page" data-page="tbt" hidden><div class="tbwrap" id="tbw-tbt"></div></div>
   <!-- Export -->
   <div class="page" data-page="exp" hidden>
-    <section class="card"><div class="body">
-      <div class="toolbar" style="margin:0"><label class="lbl" for="expMission">Mission</label><select id="expMission" style="width:auto;min-width:220px"></select><span class="sep"></span><label class="lbl" for="expFrom">Du</label><input type="date" id="expFrom" style="width:auto"><label class="lbl" for="expTo">au</label><input type="date" id="expTo" style="width:auto"><button class="btn small" type="button" id="expYear">Cette année</button><button class="btn small" type="button" id="expPrev">Année passée</button><button class="btn small" type="button" id="expAny">Toutes dates</button><span class="sep"></span><button class="btn small" type="button" id="expAll">Tout cocher</button><button class="btn small" type="button" id="expNone">Tout décocher</button></div>
-    </div></section>
-    <section class="card" id="expTirF" hidden><h2>Filtres du carnet de tir</h2><div class="body">
-      <p class="note" style="margin:0 0 8px">Rien de coché = tout. Les tirs sont exportés par ordre chronologique.</p>
-      <div class="crit"><span class="lbl">Années</span><div class="chips" id="etfY"></div></div>
-      <div class="crit"><span class="lbl">Types de tir</span><div class="chips" id="etfE"></div></div>
-      <div class="crit"><span class="lbl">Types d’arme</span><div class="chips" id="etfA"></div></div>
-    </div></section>
-    <section class="card"><h2>Documents disponibles</h2><div class="body" id="expList"></div></section>
-    <div class="nav"><span class="status" id="expStatus"></span><button class="btn next" type="button" id="expGo" style="background:var(--navy);border-color:var(--navy);color:var(--navy-ink)" disabled>Exporter</button></div>
+    <div class="xtabs" role="tablist"><button type="button" role="tab" data-xt="exp" aria-selected="true">⬇ Exporter</button><button type="button" role="tab" data-xt="imp" aria-selected="false">⬆ Importer</button></div>
+    <div id="xExp">
+      <section class="card"><h2><span class="stepn">1</span>Quoi exporter ?</h2><div class="body"><div class="xtypes" id="expTypes"></div></div></section>
+      <section class="card"><h2><span class="stepn">2</span>Filtrer</h2><div class="body">
+        <div class="xrow"><span class="lbl">Période</span><div class="seg" id="expPer"><button type="button" id="expAny">Toutes</button><button type="button" id="expYear">Cette année</button><button type="button" id="expPrev">Année passée</button><button type="button" id="expCustom">Dates…</button></div>
+          <span id="expDates" hidden><input type="date" id="expFrom" aria-label="Du" style="width:auto"> → <input type="date" id="expTo" aria-label="Au" style="width:auto"></span></div>
+        <div class="xrow"><span class="lbl"><label for="expMission">Mission</label></span><select id="expMission" style="width:auto;min-width:240px"></select></div>
+        <div id="expTirF" hidden>
+          <div class="xrow"><span class="lbl">Années (tirs)</span><div class="chips" id="etfY"></div></div>
+          <div class="xrow"><span class="lbl">Types de tir</span><div class="chips" id="etfE"></div></div>
+          <div class="xrow"><span class="lbl">Armes</span><div class="chips" id="etfA"></div></div>
+          <p class="note" style="margin:4px 0 0">Carnet : rien de coché = tout · tirs du plus ancien au plus récent · mêmes filtres que dans l’outil Carnet de tir.</p>
+        </div>
+      </div></section>
+      <section class="card"><h2><span class="stepn">3</span>Documents<span class="h2act"><button type="button" class="linkbtn" id="expAll">Tout cocher</button> · <button type="button" class="linkbtn" id="expNone">Aucun</button></span></h2><div class="body" id="expList"></div></section>
+      <div class="xgo"><span class="status" id="expStatus"></span><button class="btn next" type="button" id="expGo" disabled>Télécharger</button></div>
+    </div>
+    <div id="xImp" hidden>
+      <div class="ximp">
+        <button type="button" class="ximpc" data-imp="folder"><b>Fiches Heures Mission</b><span>Un dossier (et ses sous-dossiers) de fiches Excel V9.0</span></button>
+        <button type="button" class="ximpc" data-imp="files"><b>Fiches Heures Mission</b><span>Un ou plusieurs fichiers Excel V9.0</span></button>
+        <button type="button" class="ximpc" data-imp="tir"><b>Carnet de tir</b><span>Un fichier Excel de carnet (en-tête et tirs)</span></button>
+        <button type="button" class="ximpc" data-imp="tirpaste"><b>Carnet de tir</b><span>Coller des lignes copiées depuis Excel</span></button>
+        <button type="button" class="ximpc" data-imp="restore"><b>Sauvegarde</b><span>Restaurer un .json ou un zip de db/backup (fusion, rien n’est effacé)</span></button>
+      </div>
+      <p class="note" style="margin:12px 2px 0">Les fichiers sont lus sur ton appareil : rien n’est envoyé en ligne.</p>
+    </div>
   </div>
 
   <!-- Paramétrage de la liste type -->
@@ -1568,7 +1590,7 @@ function go(n){
   $('#homeBtn').textContent = tool === 'cl' ? 'Mes check-lists' : tool === 'mad' ? 'Mes MAD' : tool === 'notes' ? 'Mes notes' : tool === 'sum' ? 'Toutes les missions' : 'Mes missions';
   $('#appsBtn').hidden = !tool;
   $('#gearBtn').hidden = true; $('#appsOrg').hidden = n !== 'apps'; if (n !== 'apps' && appsOrg) { appsOrg = false; } $('#brandLogo').hidden = n !== 'apps';
-  const ttl = !tool ? 'Outils Mission' : tool === 'cl' ? 'Check-list voyage' : tool === 'mad' ? 'MAD – mise à disposition' : tool === 'notes' ? 'Notes' : tool === 'tir' ? 'Carnet de tir' : tool === 'exp' ? 'Export' : tool === 'tbc' ? 'Connecteurs' : tool === 'tbq' ? 'Couples de serrage' : tool === 'tbt' ? 'Balistique' : tool === 'sum' ? 'Résumé par mission' : 'Heures Mission';
+  const ttl = !tool ? 'Outils Mission' : tool === 'cl' ? 'Check-list voyage' : tool === 'mad' ? 'MAD – mise à disposition' : tool === 'notes' ? 'Notes' : tool === 'tir' ? 'Carnet de tir' : tool === 'exp' ? 'Import / Export' : tool === 'tbc' ? 'Connecteurs' : tool === 'tbq' ? 'Couples de serrage' : tool === 'tbt' ? 'Balistique' : tool === 'sum' ? 'Résumé par mission' : 'Heures Mission';
   document.querySelector('.wrap').classList.toggle('widewrap', n === 'madm');
   $('#appTitle').textContent = ttl; document.title = ttl;
   if (['tbc','tbq','tbt'].includes(n)) openTB(n);
@@ -3097,16 +3119,24 @@ function exportItems(){
   if (expMission === 'all' && !expFrom && !expTo) out.push({ g: 'Sauvegarde', id: 'b:json', label: 'Sauvegarde complète de toutes les données (.json)', run: async () => saveFile(`Heures_Mission_sauvegarde_${todayIso()}.json`, new Blob([JSON.stringify({ app: 'mission-v9', version: 1, exported: new Date().toISOString(), profil: { perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs }, missions: Object.fromEntries(Store.missions) }, null, 2)], { type: 'application/json' })) });
   return out;
 }
-const expSel = new Set();
+const expSel = new Set(); let expType = 'all', expTab = 'exp';
+const EXP_TYPES = [['all', 'Tout'], ['Heures Mission', 'Heures Mission'], ['Résumé', 'Résumés'], ['Check-list voyage', 'Check-lists'], ['MAD', 'MAD'], ['Carnet de tir', 'Carnet de tir'], ['Notes', 'Notes'], ['Sauvegarde', 'Sauvegarde']];
 function renderEXP(){
+  $$('.xtabs [data-xt]').forEach(x => x.setAttribute('aria-selected', String(x.dataset.xt === expTab))); $('#xExp').hidden = expTab !== 'exp'; $('#xImp').hidden = expTab !== 'imp';
+  { const tf = expTirSel, keep = new Set([...tf.y, ...tf.e, ...tf.a]); const per = !expFrom && !expTo ? 'expAny' : (() => { const y = new Date().getFullYear(); return expFrom === y + '-01-01' && expTo === y + '-12-31' ? 'expYear' : expFrom === (y - 1) + '-01-01' && expTo === (y - 1) + '-12-31' ? 'expPrev' : 'expCustom'; })();
+    $$('#expPer button').forEach(x => x.setAttribute('aria-pressed', String(x.id === per))); if (per === 'expCustom') $('#expDates').hidden = false; else if (!expDatesOpen) $('#expDates').hidden = true; }
+  const allItems = exportItems(true); const cnt = g => allItems.filter(i => g === 'all' || i.g === g).length;
+  $('#expTypes').innerHTML = EXP_TYPES.map(([g, l]) => { const n = cnt(g); return `<button type="button" class="xtype" data-xtype="${esc(g)}" aria-pressed="${expType === g}" ${n || g === 'all' ? '' : 'disabled'}><b>${l}</b><small>${n} document${n > 1 ? 's' : ''}</small></button>`; }).join('');
+  $('#expTirF').hidden = !(expType === 'all' || expType === 'Carnet de tir') || !st.tirs.length;
   renderExpTirF();
   const names = [...allNamed().values()].sort((a, b) => a.name.localeCompare(b.name));
   $('#expMission').innerHTML = `<option value="all">Toutes les missions</option>${names.map(x => `<option value="${esc(x.key)}">${esc(x.name)}</option>`).join('')}<option value="__none">Sans nom de mission</option>`;
   $('#expMission').value = expMission;
-  const items = exportItems(); const ids = new Set(items.map(i => i.id)); for (const s of [...expSel]) if (!ids.has(s)) expSel.delete(s);
+  const items = exportItems().filter(i => expType === 'all' || i.g === expType); const ids = new Set(items.map(i => i.id)); for (const s of [...expSel]) if (!ids.has(s)) expSel.delete(s);
   const groups = [...new Set(items.map(i => i.g))];
   $('#expList').innerHTML = groups.map(g => `<div class="clgrp"><h3>${esc(g)}</h3>${items.filter(i => i.g === g).map(i => `<label class="clitem"><input type="checkbox" data-exp="${esc(i.id)}" ${expSel.has(i.id) ? 'checked' : ''}><span>${esc(i.label)}${i.sub ? ` <small class="note">${esc(i.sub)}</small>` : ''}</span></label>`).join('')}</div>`).join('') || '<p class="note">Rien à exporter pour ce choix.</p>';
-  const n = expSel.size; $('#expGo').disabled = !n; $('#expGo').textContent = n > 1 ? `Exporter ${n} documents (zip)` : n === 1 ? 'Exporter le document' : 'Exporter';
+  const n = expSel.size; $('#expGo').disabled = !n; $('#expGo').textContent = n > 1 ? `⬇ Télécharger ${n} documents (zip)` : n === 1 ? '⬇ Télécharger le document' : 'Coche au moins un document';
+  if (!items.length) $('#expList').innerHTML = '<p class="note" style="margin:0">Aucun document pour ces filtres.</p>';
 }
 $('#expMission').addEventListener('change', e => { expMission = e.target.value; renderEXP(); });
 const setPer = (f, t) => { expFrom = f; expTo = t; $('#expFrom').value = f; $('#expTo').value = t; renderEXP(); };
@@ -3114,9 +3144,16 @@ $('#expFrom').addEventListener('change', e => setPer(e.target.value, expTo));
 $('#expTo').addEventListener('change', e => setPer(expFrom, e.target.value));
 $('#expYear').addEventListener('click', () => { const y = new Date().getFullYear(); setPer(y + '-01-01', y + '-12-31'); });
 $('#expPrev').addEventListener('click', () => { const y = new Date().getFullYear() - 1; setPer(y + '-01-01', y + '-12-31'); });
-$('#expAny').addEventListener('click', () => setPer('', ''));
+$('#expAny').addEventListener('click', () => { expDatesOpen = false; setPer('', ''); });
 $('#expList').addEventListener('change', e => { const c = e.target.closest('[data-exp]'); if (!c) return; c.checked ? expSel.add(c.dataset.exp) : expSel.delete(c.dataset.exp); renderEXP(); });
-$('#expAll').addEventListener('click', () => { exportItems().forEach(i => expSel.add(i.id)); renderEXP(); });
+$('#expAll').addEventListener('click', () => { exportItems().filter(i => expType === 'all' || i.g === expType).forEach(i => expSel.add(i.id)); renderEXP(); });
+let expDatesOpen = false;
+$('#expCustom').addEventListener('click', () => { expDatesOpen = true; $('#expDates').hidden = false; $$('#expPer button').forEach(x => x.setAttribute('aria-pressed', String(x.id === 'expCustom'))); $('#expFrom').focus(); });
+$('#expTypes').addEventListener('click', e => { const b = e.target.closest('[data-xtype]'); if (!b || b.disabled) return; expType = b.dataset.xtype; expSel.clear(); exportItems().filter(i => expType !== 'all' && i.g === expType).forEach(i => expSel.add(i.id)); renderEXP(); });
+$$('.xtabs [data-xt]').forEach(x => x.addEventListener('click', () => { expTab = x.dataset.xt; renderEXP(); }));
+$('#xImp').addEventListener('click', e => { const b = e.target.closest('[data-imp]'); if (!b) return; const k = b.dataset.imp;
+  if (k === 'folder') $('#importBtn').click(); else if (k === 'files') $('#importFilesBtn').click(); else if (k === 'restore') $('#restoreFile').click();
+  else if (k === 'tir') { go('tir'); $('#tirImpFile').click(); } else if (k === 'tirpaste') { go('tir'); $('#tirPasteBtn') ? $('#tirPasteBtn').click() : null; } });
 $('#expNone').addEventListener('click', () => { expSel.clear(); renderEXP(); });
 $('#expGo').addEventListener('click', async () => {
   const items = exportItems().filter(i => expSel.has(i.id)); if (!items.length) return;
