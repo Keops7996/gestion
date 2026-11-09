@@ -737,6 +737,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
           <button class="btn" type="button" id="importFilesBtn">Importer des fichiers…</button>
           <span class="sep"></span>
           <button class="btn" type="button" id="backupBtn">Télécharger une sauvegarde</button>
+          <button class="btn" type="button" id="restoreBtn">Restaurer une sauvegarde…</button><input type="file" id="restoreFile" accept=".json,.zip,application/json,application/zip" hidden>
         </div>
         <p class="hint" style="margin:8px 0 0">Import : fiches Mission V9 (.xlsx) dans un dossier et ses sous-dossiers, ou sauvegardes .json. Une mission déjà présente (même départ et même pays) est mise à jour seulement si la fiche est plus récente.</p>
         <input type="file" id="importDir" webkitdirectory multiple hidden>
@@ -3187,6 +3188,22 @@ for (const [id, base] of [['#twDate'], ['#nwDate'], ['#mdDate'], ['#clnDep'], ['
     if (!k) v = todayIso(); else { const ref = inp.value || (base && $(base).value) || todayIso(); const d = new Date(ref + 'T12:00:00'); d.setDate(d.getDate() + k); v = d.toISOString().slice(0, 10); }
     inp.value = v; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); });
 }
+/* ---- restauration d'une sauvegarde (.json ou zip db/backup) ---- */
+$('#restoreBtn').addEventListener('click', () => $('#restoreFile').click());
+$('#restoreFile').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { let txt; if (/\.zip$/i.test(f.name)) { const z = await JSZip.loadAsync(f); const j = z.file('donnees.json') || z.file(/\.json$/i)[0]; if (!j) throw new Error('pas de donnees.json'); txt = await j.async('string'); } else txt = await f.text();
+    const B = JSON.parse(txt); if (!B || B.app !== 'mission-v9' || !B.profil) throw new Error('format');
+    const P = B.profil, newer = (x, y) => (x.updated || x.created || '') > (y.updated || y.created || '');
+    let n = 0; const merge = (k) => { const cur = st[k] || (st[k] = []); for (const it of (P[k] || [])) { const i = cur.findIndex(x => x.id === it.id); if (i < 0) { cur.push(it); n++; } else if (newer(it, cur[i])) { cur[i] = it; n++; } } };
+    ['lists', 'mads', 'notes', 'tirs'].forEach(merge);
+    if (P.cfg && (!st.cfg.items || !st.cfg.items.length || confirmCfg)) st.cfg = P.cfg;
+    if (P.perso && !((st.perso || {}).nom || (st.perso || {}).prenom)) st.perso = P.perso; else if (P.perso && P.perso.carnet && !(st.perso.carnet && st.perso.carnet.formations && st.perso.carnet.formations.some(x => x.date))) st.perso.carnet = P.perso.carnet;
+    if (P.sign && !st.sign) st.sign = P.sign;
+    let m = 0; for (const [id, d] of Object.entries(B.missions || {})) { const cur = Store.missions.get(id); if (!cur || (d.savedAt || '') > (cur.savedAt || '')) { await Store.save(id, d); m++; } }
+    Store.saveProfil(); fillFields(); refreshToolView(); renderHome();
+    saveState(`Sauvegarde restaurée : ${m} mission${m > 1 ? 's' : ''}, ${n} élément${n > 1 ? 's' : ''} (check-lists, MAD, notes, tirs)`);
+  } catch(err) { saveState('Fichier non reconnu : choisis une sauvegarde .json ou un zip de db/backup.'); } });
+const confirmCfg = false;
 fillFields(); renderDays(); go('apps'); Store.init(); { const w = document.getElementById('jsWarn'); if (w) w.remove(); }
 })();
 </script>
