@@ -372,6 +372,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 #scanBox{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#fff}#scanBox[hidden]{display:none}#scanBox video{width:min(92vw,520px);border-radius:12px}
 .appsbar{display:flex;justify-content:flex-end;margin:0 0 10px}.apps.org .app{justify-content:flex-start;cursor:grab;outline:2px dashed color-mix(in srgb,var(--navy) 35%,transparent);outline-offset:2px}.apps.org .app.off{opacity:.4}.apps:not(.org) .app.off{display:none}.tctl{order:-1;align-self:stretch;display:flex;justify-content:center;gap:6px;margin:0 0 8px;padding:0 0 8px;border-bottom:1px dashed var(--line)}.tctl span{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:var(--sheet);border:1px solid var(--line);font-size:14px;color:var(--ink)}.apps .app{position:relative}.app.drag{opacity:.5}
 .topacts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;align-self:center;justify-content:flex-end;margin-left:auto}.topacts .btn{height:38px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding-top:0;padding-bottom:0;box-sizing:border-box}@media(max-width:520px){#appsOrg{font-size:0}#appsOrg::before{content:"✎";font-size:15px}}
+.tirfil{display:grid;gap:6px;margin:0 0 12px}.tirfil .tfrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;justify-content:flex-start}.tirfil .lbl{min-width:96px;font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em}.tirfil .chip small{opacity:.7;margin-left:3px}.tirfil .clr{border:0;background:none;color:var(--navy);font:inherit;font-size:12.5px;cursor:pointer;text-decoration:underline}
 .sug .chip{padding:4px 10px;font-size:12px}.sug .chip.prop{border-style:dashed;font-weight:600}
 .sug .chip small{color:inherit;opacity:.75;margin-left:4px}
 .notegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
@@ -664,8 +665,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
       <div class="nav" style="margin-top:8px"><span class="note" id="tirPasteInfo"></span><span style="display:flex;gap:8px"><button class="btn" type="button" id="tirPasteCancel">Annuler</button><button class="btn primary-s" type="button" id="tirPasteOk">Importer ces lignes</button></span></div>
     </div></div>
     <div class="hometop"><div class="madsum" id="tirSum"></div><div class="clhead"><input id="tirSearch" placeholder="Rechercher…" aria-label="Rechercher" style="width:200px"><div class="menuwrap"><button class="kebab" type="button" data-menu="tirMenu" aria-label="Plus d’options" aria-expanded="false">⋯</button><div class="menu" id="tirMenu" hidden><button type="button" id="tirImpBtn">Importer un fichier Excel</button><button type="button" id="tirPasteBtn">Coller des lignes depuis Excel</button><button type="button" id="tirXlsx" hidden>Exporter en Excel</button><button type="button" id="tirPdf" hidden>Exporter en PDF</button></div></div></div></div>
-    <div class="chips" id="tirYears"></div>
-    <div class="chips" id="tirArmes"></div>
+    <div class="tirfil" id="tirFil"></div>
     <div class="tablebox madbox"><table class="madtab tirtab"><thead><tr><th>Date</th><th>Arme</th><th>Type d’essai</th><th class="num">Cps</th><th>Examinateur</th><th>Mission</th><th>Remarques</th><th></th></tr></thead><tbody id="tirRows"></tbody></table></div>
   </div>
 
@@ -2783,13 +2783,26 @@ if (!Array.isArray(st.tirs)) st.tirs = [];
 const CARNET_DEF = () => ({ tel: '', formations: [{ label: 'Formation législative', date: '' }, { label: 'Formation sécurité', date: '' }, { label: 'Formation Zutendaal', date: '' }],
   fnDepuis: '', stagDepuis: '', resp: { nom: '', prenom: '', tel: '' }, exam: { nom: '', prenom: '', service: '', tel: '' } });
 function carnet(){ if (!st.perso.carnet) st.perso.carnet = CARNET_DEF(); const c = st.perso.carnet; c.resp = c.resp || { nom: '', prenom: '', tel: '' }; c.exam = c.exam || { nom: '', prenom: '', service: '', tel: '' }; c.formations = c.formations || CARNET_DEF().formations; return c; }
-let tirQ = '', tirArme = 'all', tirYear = 'all';
+let tirQ = '';
+const expTirSel = { y: new Set(), e: new Set(), a: new Set() };
 const getTir = id => st.tirs.find(t => t.id === id);
 const cps = t => Math.round(nb(t.cps));
 const tirCmp = (a, b) => { const x = (a.arme || '').trim(), y = (b.arme || '').trim(); if (!x !== !y) return x ? -1 : 1; return x.localeCompare(y, 'fr', { sensitivity: 'base', numeric: true }) || ((a.date || '9999') + (a.created || '')).localeCompare((b.date || '9999') + (b.created || '')); };
 function tirSorted(){ return [...st.tirs].sort(tirCmp); }
 function tirFiltered(){ const q = normTxt(tirQ);
-  return tirSorted().filter(t => (tirArme === 'all' || normTxt(t.arme) === tirArme) && (tirYear === 'all' || (t.date || '').slice(0, 4) === tirYear) && (!q || normTxt([t.arme, t.essai, t.exam, t.rem, t.mission].join(' ')).includes(q))); }
+  return st.tirs.filter(t => tirSelIn(t) && (!q || normTxt([t.arme, t.essai, t.exam, t.rem, t.mission].join(' ')).includes(q)))
+    .sort((p, x) => ((x.date || '0000') + (x.created || '')).localeCompare((p.date || '0000') + (p.created || ''))); }
+const tirKey = { y: t => (t.date || '').slice(0, 4) || '—', e: t => normTxt(t.essai) || '—', a: t => normTxt(t.arme) || '—' };
+const tirSelIn = (t, skip) => ['y', 'e', 'a'].every(k => k === skip || !expTirSel[k].size || expTirSel[k].has(tirKey[k](t)));
+function renderTirFil(){
+  const lbl = { y: t => (t.date || '').slice(0, 4) || 'Sans date', e: t => (t.essai || '').trim() || 'Non précisé', a: t => (t.arme || '').trim() || 'Non précisée' };
+  const grp = (k, title) => { const m = new Map(); for (const t of st.tirs.filter(t => tirSelIn(t, k))) { const kk = tirKey[k](t); if (!m.has(kk)) m.set(kk, { l: lbl[k](t), n: 0 }); m.get(kk).n += cps(t); }
+    for (const v of expTirSel[k]) if (!m.has(v)) m.set(v, { l: v, n: 0 });
+    const arr = [...m].sort((x, y) => k === 'y' ? String(y[1].l).localeCompare(String(x[1].l)) : String(x[1].l).localeCompare(String(y[1].l), 'fr', { numeric: true }));
+    return `<div class="tfrow"><span class="lbl">${title}</span>${arr.map(([kk, o]) => `<button type="button" class="chip" data-tf="${k}" data-v="${esc(kk)}" aria-pressed="${expTirSel[k].has(kk)}">${esc(o.l)}<small>${o.n.toLocaleString('fr-BE')}</small></button>`).join('')}</div>`; };
+  const any = ['y', 'e', 'a'].some(k => expTirSel[k].size);
+  $('#tirFil').innerHTML = st.tirs.length ? grp('y', 'Années') + grp('e', 'Types de tir') + grp('a', 'Armes') + (any ? '<div><button type="button" class="clr" data-tfclr>Effacer les filtres</button> <span class="note">· les mêmes filtres s’appliquent à l’export</span></div>' : '') : '';
+}
 function renderTIR(){
   const c = carnet();
   { const lim = new Date(); lim.setFullYear(lim.getFullYear() - 1); const L = lim.toISOString().slice(0, 10);
@@ -2811,9 +2824,7 @@ function renderTIR(){
   // filtres + totaux
   const armes = [...new Map(st.tirs.filter(t => t.arme).map(t => [normTxt(t.arme), t.arme.trim()])).entries()];
   const years = [...new Set(st.tirs.map(t => (t.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
-  $('#tirYears').innerHTML = [['all', 'Toutes'], ...years.map(y => [y, y])].map(([v, l]) => `<button type="button" class="chip" data-y="${v}" aria-pressed="${tirYear === v}">${l}</button>`).join('');
-  const inYear = st.tirs.filter(t => tirYear === 'all' || (t.date || '').slice(0, 4) === tirYear);
-  $('#tirArmes').innerHTML = [['all', 'Toutes armes', inYear.reduce((s, t) => s + cps(t), 0)], ...armes.map(([k, l]) => [k, l, inYear.filter(t => normTxt(t.arme) === k).reduce((s, t) => s + cps(t), 0)])].map(([v, l, n]) => `<button type="button" class="chip" data-a="${esc(v)}" aria-pressed="${tirArme === v}">${esc(l)} <b>${n.toLocaleString('fr-BE')}</b></button>`).join('');
+  renderTirFil();
   const list = tirFiltered(), tot = list.reduce((s, t) => s + cps(t), 0);
   const yr = String(new Date().getFullYear()), totY = list.filter(t => (t.date || '').startsWith(yr)).reduce((s, x) => s + cps(x), 0);
   $('#tirSum').innerHTML = `<span><b>${list.length}</b> tir${list.length > 1 ? 's' : ''}</span><span><b>${tot.toLocaleString('fr-BE')}</b> coups</span><span><b>${totY.toLocaleString('fr-BE')}</b> en ${yr}</span>`;
@@ -2874,8 +2885,7 @@ $('#tirRows').addEventListener('keydown', e => { if (e.key !== 'Enter' || !e.tar
 $('#tirRows').addEventListener('keydown', e => { const tr = e.target.closest && e.target.closest('tr[data-id]'); if (tr && e.target === tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tr.click(); } });
 $('#tirRows').addEventListener('click', e => { const del = e.target.closest('[data-del]'); if (!del) { const tr = e.target.closest('tr[data-id]'); const t = tr && getTir(tr.dataset.id); if (t) tirForm(t); return; } const tr = del.closest('tr[data-id]');
   { const old = getTir(tr.dataset.id); st.tirs = st.tirs.filter(t => t.id !== tr.dataset.id); if (tirEdit === tr.dataset.id) tirForm(null); tirSave(); renderTIR(); if (old) undoToast('Tir supprimé', () => { st.tirs.push(old); tirSave(old); renderTIR(); }); } });
-$('#tirYears').addEventListener('click', e => { const b = e.target.closest('[data-y]'); if (b) { tirYear = b.dataset.y; renderTIR(); } });
-$('#tirArmes').addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) { tirArme = b.dataset.a; renderTIR(); } });
+$('#tirFil').addEventListener('click', e => { if (e.target.closest('[data-tfclr]')) { ['y', 'e', 'a'].forEach(k => expTirSel[k].clear()); renderTIR(); return; } const b = e.target.closest('[data-tf]'); if (!b) return; const S = expTirSel[b.dataset.tf], v = b.dataset.v; S.has(v) ? S.delete(v) : S.add(v); renderTIR(); });
 $('#tirSearch').addEventListener('input', e => { tirQ = e.target.value; renderTIR(); });
 // en-tête du carnet
 $('#tirHead').addEventListener('input', e => { const el = e.target, c = carnet();
@@ -3046,7 +3056,6 @@ function listText(l){ const items = clItems(l); return [`Check-list ${l.title ||
 function notesText(list){ return list.slice().sort((p, q) => (p.date || '').localeCompare(q.date || '')).map(n => `${n.date ? dFr(n.date) : 'Sans date'}${n.mission ? ' · ' + n.mission : ''}\r\n${n.body || ''}`).join('\r\n\r\n----------\r\n\r\n'); }
 const inExp = name => expMission === 'all' || (expMission === '__none' ? !mkey(name) : mkey(name) === expMission);
 let expFrom = '', expTo = '';
-const expTirSel = { y: new Set(), e: new Set(), a: new Set() };
 function renderExpTirF(){ const box = $('#expTirF'); const base = st.tirs.filter(t => inExp(t.mission) && inDates(t.date)); box.hidden = !st.tirs.length; if (!st.tirs.length) return;
   const grp = (id, k, keyOf, lblOf) => { const m = new Map(); for (const t of base) { const kk = keyOf(t); if (!m.has(kk)) m.set(kk, { l: lblOf(t), n: 0 }); m.get(kk).n += 1; }
     for (const v of [...expTirSel[k]]) if (!m.has(v)) expTirSel[k].delete(v);
