@@ -379,6 +379,10 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 .xrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 10px}.xrow .lbl{min-width:110px;font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em}.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden}.seg button{border:0;border-right:1px solid var(--line);background:var(--sheet);color:var(--ink);font:inherit;font-size:13px;padding:7px 12px;cursor:pointer}.seg button:last-child{border-right:0}.seg button[aria-pressed="true"]{background:var(--navy);color:var(--navy-ink)}
 .xgo{position:sticky;bottom:12px;display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:14px}.xgo .btn{background:var(--navy);border-color:var(--navy);color:var(--navy-ink);padding:12px 20px;box-shadow:0 8px 20px -10px var(--navy)}.xgo .btn[disabled]{opacity:.5;box-shadow:none}
 .ximp{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.ximpc{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--sheet);color:var(--ink);font:inherit;text-align:left;cursor:pointer}.ximpc b{font-size:14px}.ximpc span{color:var(--ink-2);font-size:12.5px}.ximpc:hover{border-color:var(--navy)}
+#printArea{display:none}
+@media print{body.printing>*:not(#printArea){display:none!important}body.printing #printArea{display:block!important}body.printing{background:#fff!important;color:#000!important}
+#printArea{font:11pt/1.35 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#000}#printArea h1{font-size:18pt;margin:0 0 2pt}#printArea .pm{color:#444;font-size:10pt;margin:0 0 10pt}#printArea .pc{break-inside:avoid;margin:0 0 9pt}#printArea h2{font-size:10.5pt;text-transform:uppercase;letter-spacing:.06em;border-bottom:1.2pt solid #051989;color:#051989;margin:0 0 4pt;padding-bottom:2pt}#printArea ul{list-style:none;margin:0;padding:0;columns:2;column-gap:18pt}#printArea li{break-inside:avoid;display:flex;gap:7pt;align-items:flex-start;padding:2.5pt 0;border-bottom:.4pt solid #ddd}#printArea .bx{flex:none;width:10pt;height:10pt;border:1pt solid #000;border-radius:2pt;margin-top:1.5pt;text-align:center;font-size:8pt;line-height:10pt}#printArea .ok{color:#555;text-decoration:line-through}#printArea .pf{margin-top:12pt;font-size:8.5pt;color:#666;display:flex;justify-content:space-between}
+@page{margin:14mm}}
 .sug .chip{padding:4px 10px;font-size:12px}.sug .chip.prop{border-style:dashed;font-weight:600}
 .sug .chip small{color:inherit;opacity:.75;margin-left:4px}
 .notegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
@@ -526,7 +530,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 
   <!-- Check-list d'une mission -->
   <div class="page" data-page="clm" hidden>
-    <div class="hometop"><div style="min-width:0;flex:1"><h2 id="clmTitle" style="margin:0"></h2><p class="note" id="clmWho" style="margin:2px 0 0"></p></div><div class="clhead"><div id="clmProg" class="clprog"></div><button class="btn" type="button" id="clmEdit">Modifier</button><div class="menuwrap"><button class="kebab" type="button" data-menu="clmMenu" aria-label="Plus d’options" aria-expanded="false">⋯</button><div class="menu" id="clmMenu" hidden><button type="button" id="clmCopy">Copier la liste</button><button type="button" id="clmDup">Réutiliser pour une autre mission</button><button type="button" id="clmTpl">Enregistrer comme modèle</button><button type="button" id="clmRestore" hidden></button><button type="button" id="clmReset">Tout décocher</button><button type="button" id="clmCfgBtn">Paramétrer la liste type</button><button type="button" id="clmDel" style="color:var(--bad)">Supprimer la check-list</button></div></div></div></div>
+    <div class="hometop"><div style="min-width:0;flex:1"><h2 id="clmTitle" style="margin:0"></h2><p class="note" id="clmWho" style="margin:2px 0 0"></p></div><div class="clhead"><div id="clmProg" class="clprog"></div><button class="btn" type="button" id="clmPrint" title="Imprimer la check-list">🖨 Imprimer</button><button class="btn" type="button" id="clmEdit">Modifier</button><div class="menuwrap"><button class="kebab" type="button" data-menu="clmMenu" aria-label="Plus d’options" aria-expanded="false">⋯</button><div class="menu" id="clmMenu" hidden><button type="button" id="clmCopy">Copier la liste</button><button type="button" id="clmDup">Réutiliser pour une autre mission</button><button type="button" id="clmTpl">Enregistrer comme modèle</button><button type="button" id="clmRestore" hidden></button><button type="button" id="clmReset">Tout décocher</button><button type="button" id="clmCfgBtn">Paramétrer la liste type</button><button type="button" id="clmDel" style="color:var(--bad)">Supprimer la check-list</button></div></div></div></div>
     <section class="card">
       <h2>À préparer</h2>
       <div class="body">
@@ -911,6 +915,8 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 
 <div id="scanBox" hidden><video id="scanVid" playsinline muted></video><p id="scanMsg">Vise le code-barres ou le QR code du PN…</p><button class="btn" type="button" id="scanClose">Fermer</button></div>
 <div id="imgView" hidden><img alt=""></div>
+
+<div id="printArea" aria-hidden="true"></div>
 <script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -2333,6 +2339,13 @@ $('#clmList').addEventListener('click', e => { const b = e.target.closest('[data
   saveCL(); renderCLM(); });
 $('#clmAdd').addEventListener('submit', e => { e.preventDefault(); const t = $('#clmNew').value.trim(); if (!t) return; const l = getList(clId);
   l.extra.push({ id: 'x' + Date.now().toString(36), cat: $('#clmCat').value, text: t, done: false }); $('#clmNew').value = ''; saveCL(); renderCLM(); });
+$('#clmPrint').addEventListener('click', () => { const l = getList(clId); if (!l) return; const items = clItems(l), cats = [...new Set([...st.cfg.cats, ...items.map(i => i.cat)])].filter(c => items.some(i => i.cat === c));
+  const done = items.filter(i => i.done).length, P = st.perso || {};
+  $('#printArea').innerHTML = `<h1>${esc(l.title || l.mission || 'Check-list')}</h1><p class="pm">${[l.mission && l.mission !== l.title ? 'Mission : ' + esc(l.mission) : '', l.depart ? 'Départ ' + dFr(l.depart) : '', l.retour ? 'retour ' + dFr(l.retour) : '', `${done} / ${items.length} prêts`].filter(Boolean).join(' · ')}${l.note ? '<br>' + esc(l.note) : ''}</p>`
+    + cats.map(c => `<section class="pc"><h2>${esc(c)}</h2><ul>${items.filter(i => i.cat === c).map(i => `<li><span class="bx">${i.done ? '✓' : ''}</span><span class="${i.done ? 'ok' : ''}">${esc(i.text)}</span></li>`).join('')}</ul></section>`).join('')
+    + `<div class="pf"><span>${esc([P.prenom, P.nom].filter(Boolean).join(' '))}</span><span>Imprimé le ${new Date().toLocaleDateString('fr-BE')}</span></div>`;
+  document.body.classList.add('printing'); const off = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', off); }; window.addEventListener('afterprint', off);
+  setTimeout(() => { try { window.print(); } catch(e) { saveState('Impression bloquée ici : utilise le fichier ou le site en ligne.'); } setTimeout(off, 1500); }, 50); });
 $('#clmDup').addEventListener('click', () => { closeMenus(); const l = getList(clId); if (!l) return; cle = { mode: 'new', step: 1, draft: { mname: '', title: '', note: l.note || '', depart: '', retour: '', sel: [...l.sel], from: l.id } }; go('cle'); saveState('Choisis le nom et les dates de la nouvelle mission'); });
 $('#clmTpl').addEventListener('click', () => { closeMenus(); const l = getList(clId); if (!l) return; st.cfg.templates = st.cfg.templates || []; const name = l.title || l.mission || 'Modèle'; const ex = st.cfg.templates.find(t => normTxt(t.name) === normTxt(name));
   const t = { id: ex ? ex.id : 'tp' + Date.now().toString(36), name, sel: [...l.sel], off: { ...(l.off || {}) }, extra: (l.extra || []).map(x => ({ cat: x.cat, text: x.text })) }; if (ex) Object.assign(ex, t); else st.cfg.templates.push(t); saveCfgSoon(); saveState(ex ? `Modèle « ${name} » mis à jour` : `Modèle « ${name} » enregistré`); });
