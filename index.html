@@ -2581,8 +2581,9 @@ function unusedNames(kind, current){
   const cur = mkey(current || '');
   return [...allNamed().values()].filter(x => kind === 'note' || kind === 'tir' || !x[kind].length || x.key === cur).map(x => {
     const h = x.h[0] && x.h[0].d, l = x.cl[0], m = x.mad[0];
-    const depart = (h && h.sum.depart) || (l && l.depart) || (m && m.date) || '', retour = (h && h.sum.retour) || (l && l.retour) || '';
-    return { name: x.name, depart, retour, ville: (h && h.sum.ville) || (l && l.title) || (m && m.dest) || '', pays: (h && h.sum.pays) || '', nature: (h && h.mission.nature) || (l && l.note) || '' };
+    const hs = (h && h.sum) || {}, hm = (h && h.mission) || {};
+    const depart = hs.depart || hm.depart || (l && l.depart) || (m && m.date) || '', retour = hs.retour || hm.retour || (l && l.retour) || '';
+    return { name: x.name, depart, retour, ville: hs.ville || hm.ville || (l && l.title) || (m && m.dest) || '', pays: hs.pays || hm.pays || '', nature: hm.nature || (l && l.note) || '' };
   }).sort((p, q) => (q.depart || '').localeCompare(p.depart || ''));
 }
 function updateNames(){
@@ -2613,19 +2614,27 @@ for (const [ids, kind, inp] of [[['#m_ville', '#m_pays', '#m_depart'], 'h', '#m_
 function pickSug(kind, e){
   const b = e.target.closest('[data-sug]'); if (!b) return null; return $('#sug-' + kind)._list[+b.dataset.sug];
 }
-$('#sug-h').addEventListener('click', e => { const x = pickSug('h', e); if (!x) return;
-  st.mission.nom = x.name; if (!st.mission.depart && x.depart) st.mission.depart = x.depart; if (!st.mission.retour && x.retour) st.mission.retour = x.retour;
-  if (!st.mission.ville && x.ville && x.pays) st.mission.ville = x.ville; if (!st.mission.nature && x.nature) st.mission.nature = x.nature;
-  touched('mission.nom'); fillFields(); renderDays(); update(); renderSug('h', st.mission.nom); });
-$('#sug-cl').addEventListener('click', e => { const x = pickSug('cl', e); if (!x || !cle) return; const d = cle.draft;
-  d.mname = x.name; if (!d.title) d.title = x.ville || x.name; if (!d.depart) d.depart = x.depart; if (!d.retour) d.retour = x.retour; if (!d.note) d.note = x.nature;
-  renderCLE(); });
-$('#sug-mad').addEventListener('click', e => { const x = pickSug('mad', e); if (!x || !made) return; const d = made.d;
-  d.mname = x.name; if (!d.title) d.title = 'MAD ' + x.name; if (!d.dest) d.dest = x.ville; if (!d.date) d.date = x.depart;
-  renderMADE(); });
+$('#sug-h').addEventListener('click', e => fillH(pickSug('h', e)));
+function nameInfo(name){ const k = mkey(name); return k ? unusedNames('note').find(x => mkey(x.name) === k) : null; }
+function fillCL(x){ if (!x || !cle) return; const d = cle.draft;
+  d.mname = x.name; if (!d.title) d.title = x.ville || x.name; if (!d.depart) d.depart = x.depart; if (!d.retour) d.retour = x.retour; if (!d.note) d.note = x.nature; renderCLE(); }
+function fillMAD(x){ if (!x || !made) return; const d = made.d;
+  d.mname = x.name; if (!d.title) d.title = 'MAD ' + x.name; if (!d.dest) d.dest = x.ville; if (!d.date) d.date = x.depart; renderMADE(); }
+function fillH(x){ if (!x) return; let ch = false; st.mission.nom = x.name;
+  for (const [k, v] of [['depart', x.depart], ['retour', x.retour], ['nature', x.nature]]) if (!st.mission[k] && v) { st.mission[k] = v; ch = true; }
+  if (!st.mission.ville && x.ville && x.pays) { st.mission.ville = x.ville; ch = true; } if (!st.mission.pays && x.pays) { st.mission.pays = x.pays; ch = true; }
+  touched('mission.nom'); if (ch) { fillFields(); renderDays(); } update(); renderSug('h', st.mission.nom); }
+$('#sug-cl').addEventListener('click', e => fillCL(pickSug('cl', e)));
+$('#sug-mad').addEventListener('click', e => fillMAD(pickSug('mad', e)));
 $('#clnMission').addEventListener('input', e => renderSug('cl', e.target.value));
 $('#mdMission').addEventListener('input', e => renderSug('mad', e.target.value));
 $('#m_nom').addEventListener('input', e => renderSug('h', e.target.value));
+// nom choisi dans la liste déroulante ou tapé en entier : reprise automatique des infos déjà encodées
+for (const [id, fn] of [['#clnMission', fillCL], ['#mdMission', fillMAD], ['#m_nom', fillH]]) {
+  const run = e => { const x = nameInfo(e.target.value); if (x) fn(x); };
+  $(id).addEventListener('change', run);
+  $(id).addEventListener('input', e => { if (e.inputType === 'insertReplacementText' || !e.inputType) run(e); });
+}
 function sumDates(x){
   const ds = [...x.h.map(o => [o.d.sum.depart, o.d.sum.retour]), ...x.cl.map(l => [l.depart, l.retour]), ...x.mad.map(m => [m.date, m.date])].flat().filter(Boolean).sort();
   return ds.length ? [ds[0], ds[ds.length - 1]] : ['', ''];
