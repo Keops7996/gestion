@@ -3363,17 +3363,23 @@ function ageAt(naiss, mois){ if (!naiss || !mois) return null; const [y, m] = na
 function baremeOf(p){
   const g = grilleFor(p.mois); if (!g) return { err: 'Aucun barème chargé.' };
   const classe = (p.info && p.info.statut) || '', regime = +(st.perso.regime || 100), naiss = st.perso.naiss || '';
-  const age = ageAt(naiss.slice(0, 7), p.mois); const R = g.reg[regime];
   if (!classe) return { err: 'Catégorie absente : réimporte cette fiche pour lire la catégorie de ton statut.' };
-  if (age === null) return { err: 'Indique ta date de naissance dans ton profil (page principale).' };
-  if (!R) return { err: `Le barème du ${dFr(g.date)} n’a pas de tableau ${REGS[regime] || regime + ' %'}.` };
-  const ci = R.cls.indexOf(String(classe)); if (ci < 0) return { err: `Classe ${classe} absente du barème.` };
-  const ages = Object.keys(R.ages).map(Number).sort((a, b) => a - b), a = Math.min(Math.max(age, ages[0]), ages[ages.length - 1]);
-  const bar = R.ages[a][ci];
+  if (!/^\d{4}-\d{2}/.test(naiss)) return { err: 'Indique ta date de naissance dans ton profil (page principale).' };
+  const R = g.reg[100] || g.reg[Object.keys(g.reg).sort((a, b) => b - a)[0]], base100 = g.reg[100] ? 1 : +Object.keys(g.reg).sort((a, b) => b - a)[0] / 100;
+  const ci = R.cls.indexOf(String(classe)); if (ci < 0) return { err: `Catégorie ${classe} absente du barème.` };
+  const ages = Object.keys(R.ages).map(Number).sort((a, b) => a - b), lo = ages[0], hi = ages[ages.length - 1], cl = x => Math.min(Math.max(x, lo), hi);
+  const at = x => R.ages[cl(x)][ci] / base100;
+  const [Y, M] = p.mois.split('-').map(Number), [y, m] = naiss.split('-').map(Number);
+  // méthode SETCa FN : âge de base = année − année de naissance − 1 (borné 21-50)
+  const a = cl(Y - y - 1); let full, how, ageTxt;
+  if (+classe > 410) { const k = m >= M ? a : a + 1; full = at(k); ageTxt = `${cl(k)} ans`; how = `barème à ${cl(k)} ans`; }
+  else { const n = 12 - m, b0 = at(a), b1 = at(a + 1); full = b0 + n * (b1 - b0) / 12; ageTxt = `${a} → ${cl(a + 1)} ans`;
+    how = `${eur(b0)} (${a} ans) + ${n}/12 × (${eur(b1)} − ${eur(b0)})`; }
+  const bar = Math.round(full * regime) / 100;
   const base = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'base').reduce((s, L) => s + (L.mt || 0), 0);
   const flexL = p.comm.filter(L => /^red\.?\s*sal/.test(normTxt(L.label)) && L.mt), flex = -flexL.reduce((s, L) => s + L.mt, 0);
   const theo = base + flex;
-  return { g, classe, regime, age, bar, base, flexL, flex, theo, d: theo - bar, dp: bar ? (theo - bar) / bar : NaN, bday: +naiss.split('-')[1] === +p.mois.split('-')[1] };
+  return { g, classe, regime, age: ageTxt, how, bar, base, flexL, flex, theo, d: theo - bar, dp: bar ? (theo - bar) / bar : NaN };
 }
 async function grilleImport(f){
   try { const G = parseGrille(await pdfTextItems(await f.arrayBuffer()));
@@ -3394,7 +3400,7 @@ function renderGrille(L){
   const rows = L.map(p => ({ p, b: baremeOf(p) }));
   $('#grBody').innerHTML = !G.length ? `<tr><td colspan="8" class="note" style="padding:16px">Charge le barème (PDF) pour comparer tes fiches.</td></tr>`
     : rows.map(({ p, b }) => b.err ? `<tr><td><b>${moisCap(p.mois)}</b></td><td colspan="7" class="note">${esc(b.err)}</td></tr>`
-      : `<tr data-pid="${esc(p.id)}"><td><b>${moisCap(p.mois)}</b><span class="sub">barème ${dFr(b.g.date)}</span></td><td>${b.classe} · ${b.age} ans${b.bday ? ' <small class="note">(anniv.)</small>' : ''}${b.regime !== 100 ? ' · ' + REGS[b.regime] : ''}</td><td class="num">${eur(b.bar)}</td><td class="num">${eur(b.base)}</td><td class="num">${b.flex ? '+ ' + eur(b.flex) : '—'}</td><td class="num"><b>${eur(b.theo)}</b></td><td class="num">${sgn(b.d)}</td><td class="num">${pct(b.dp)}</td></tr>`).join('')
+      : `<tr data-pid="${esc(p.id)}"><td><b>${moisCap(p.mois)}</b><span class="sub">barème ${dFr(b.g.date)}</span></td><td>${b.classe} · ${b.age}${b.regime !== 100 ? ' · ' + REGS[b.regime] : ''}</td><td class="num">${eur(b.bar)}</td><td class="num">${eur(b.base)}</td><td class="num">${b.flex ? '+ ' + eur(b.flex) : '—'}</td><td class="num"><b>${eur(b.theo)}</b></td><td class="num">${sgn(b.d)}</td><td class="num">${pct(b.dp)}</td></tr>`).join('')
       || `<tr><td colspan="8" class="note" style="padding:16px">Aucune fiche pour cette période.</td></tr>`;
   const ok = rows.filter(r => !r.b.err); let s = '';
   if (ok.length) { const ko = ok.filter(r => Math.abs(r.b.d) > 1); const sous = ko.filter(r => r.b.d < 0).length, sur = ko.length - sous; s = ko.length ? `<div class="warn"><b>${[sous && `${sous} mois sous le barème`, sur && `${sur} mois au-dessus`].filter(Boolean).join(', ')}.</b> Dérive moyenne : ${eur(ko.reduce((t, r) => t + r.b.d, 0) / ko.length)} / mois, cumul ${eur(ko.reduce((t, r) => t + r.b.d, 0))}.</div>` : `<div class="note">Toutes les fiches correspondent au barème (± 1 €).</div>`; }
@@ -3460,9 +3466,9 @@ function renderPAIED(){
       ['Écart réel − hypothèse', sgn((dN / dB - appNet) * dB, true) + ` <small class="note">(${pct(dN / dB - appNet)})</small>`]); }
     $('#pdTax').innerHTML = `<dl>${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>` + (R ? '' : '<p class="note" style="margin:10px 0 0">Importe aussi une fiche d’un mois sans mission : l’app calculera alors l’impôt réellement prélevé sur la part mission / HS et l’écart avec l’hypothèse de l’app (66 % ou 45 % de net).</p>');
   { const b = baremeOf(p); $('#pdBar').innerHTML = b.err ? `<p class="note" style="margin:0">${esc(b.err)} Renseigne ta position dans « Barème salarial » (Mes fiches).</p>`
-    : `<dl>${[[`Barème ${dFr(b.g.date)} <small>classe ${b.classe} · ${b.age} ans · ${REGS[b.regime]}</small>`, eur(b.bar)], ['Rémunération sur la fiche', eur(b.base)],
+    : `<dl>${[[`Barème ${dFr(b.g.date)} <small>catégorie ${b.classe} · ${b.age} · ${REGS[b.regime]}</small>`, eur(b.bar)], [`<small>Calcul SETCa : ${b.how}${b.regime !== 100 ? ' × ' + b.regime + ' %' : ''}</small>`, ''], ['Rémunération sur la fiche', eur(b.base)],
       ...b.flexL.map(L => [`+ ${esc(L.label)} <small>plan flex</small>`, eur(-L.mt)]), ['= Salaire avant plan flex', `<b>${eur(b.theo)}</b>`], ['Dérive vs barème', `<span class="mark">${sgn(b.d, false)}</span> <small class="note">(${pct(b.dp)})</small>`]].map(([a, v]) => `<dt>${a}</dt><dd>${v}</dd>`).join('')}</dl>`
-      + (b.bday ? '<p class="note" style="margin:8px 0 0">Mois d’anniversaire : selon la règle de l’employeur, le nouvel âge peut ne s’appliquer qu’au mois suivant.</p>' : ''); }
+; }
   $('#pdLines').innerHTML = p.lines.map((L, i) => { const k = pcat(L), ed = L.sec === 'brut';
     return `<tr><td class="note">${esc(L.code)}</td><td>${esc(L.label)}</td><td>${L.per ? moisLbl(L.per) : ''}</td><td class="num">${L.h != null ? h2(L.h) : ''}</td><td class="num">${L.j != null ? h2(L.j) : ''}</td><td class="num">${L.mt != null ? eur(L.mt) : ''}</td><td>${ed ? `<button type="button" class="pcat" data-c="${k}" data-li="${i}" title="Changer la catégorie">${PCATS[k]}</button>` : `<span class="note">${isPrec(L) ? 'Précompte' : isOnss(L) ? 'ONSS' : 'Retenue / autre'}</span>`}</td></tr>`; }).join('');
 }
