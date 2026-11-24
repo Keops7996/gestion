@@ -1544,6 +1544,7 @@ const h2 = x => isFinite(x) ? x.toLocaleString('fr-BE',{minimumFractionDigits:2,
 const hShort = x => isFinite(x) ? (Math.round(x*100)/100).toLocaleString('fr-BE',{maximumFractionDigits:2}) : '—';
 const dFr = iso => iso ? new Date(iso+'T00:00:00Z').toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit',year:'numeric',timeZone:'UTC'}) : '—';
 
+{ const dl = document.createElement('datalist'); dl.id = 'dl-pays'; dl.innerHTML = COUNTRIES.map(c => `<option value="${String(c[0]).replace(/"/g, '&quot;')}"></option>`).join(''); document.body.appendChild(dl); }
 $('#m_pays').innerHTML = '<option value="">Choisir un pays…</option>' + COUNTRIES.map(c => `<option value="${c[0]}">${c[0]}${c[1]!=null?` — ${c[1]} €`:''}</option>`).join('');
 $('#m_cflabel').innerHTML = '<option value="">—</option>' + DATA.cf.map(c => `<option>${c}</option>`).join('');
 
@@ -2184,7 +2185,9 @@ function defaultCfg(){
 }
 if (!st.cfg || !st.cfg.items) st.cfg = defaultCfg();
 function cfgGroups(){ const c = st.cfg; if (!Array.isArray(c.groups)) c.groups = [{ k: 'natures', label: 'Type de mission' }, { k: 'products', label: 'Produits' }, { k: 'contexts', label: 'Contexte' }];
+  if (!c.destInit) { if (!c.groups.some(g => g.k === 'dests')) c.groups.push({ k: 'dests', label: 'Destination (pays)' }); c.destInit = true; }
   for (const g of c.groups) if (!Array.isArray(c[g.k])) c[g.k] = []; return c.groups; }
+const destTags = l => (st.cfg.dests || []).filter(t => l.sel.includes(t.id)).map(t => t.label);
 const cfgTags = () => cfgGroups().flatMap(g => st.cfg[g.k].map(t => ({ ...t, g: g.label, gk: g.k })));
 const newTagId = () => 't-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 let clId = null, cfgTimer = null;
@@ -2276,7 +2279,7 @@ $('#clmCrit').addEventListener('click', e => {
     if (st.cfg[g.k].length && !bt.dataset.armed) { bt.dataset.armed = 1; bt.textContent = 'Supprimer avec ses sous-sujets ?'; setTimeout(() => { if (bt.isConnected) { delete bt.dataset.armed; bt.textContent = '✕'; } }, 3000); return; }
     const ids = st.cfg[g.k].map(t => t.id); st.cfg.items.forEach(it => it.tags = it.tags.filter(x => !ids.includes(x))); if (cle) cle.draft.sel = cle.draft.sel.filter(x => !ids.includes(x)); delete st.cfg[g.k]; st.cfg.groups.splice(gi, 1); saveCfgSoon(); renderCLE(); return; }
   const nb = e.target.closest('[data-tnew]');
-  if (nb) { const k = nb.dataset.tnew, inp = document.createElement('input'); inp.className = 'chip-in'; inp.placeholder = 'Nouveau sujet…'; nb.replaceWith(inp); inp.focus();
+  if (nb) { const k = nb.dataset.tnew, inp = document.createElement('input'); inp.className = 'chip-in'; inp.placeholder = k === 'dests' ? 'Pays…' : 'Nouveau sujet…'; if (k === 'dests') inp.setAttribute('list', 'dl-pays'); nb.replaceWith(inp); inp.focus();
     let done = false; const commit = chain => { if (done) return; done = true; const v = inp.value.trim();
       if (v) { const ex = st.cfg[k].find(t => normTxt(t.label) === normTxt(v)); const id = ex ? ex.id : newTagId();
         if (!ex) st.cfg[k].push({ id, label: v }); if (cle && !cleTEdit && !cle.draft.sel.includes(id)) cle.draft.sel.push(id); saveCfgSoon(); }
@@ -2322,7 +2325,7 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
 function renderCLM(){
   const l = getList(clId); if (!l) { go('cl'); return; }
-  $('#clmTitle').textContent = l.title || 'Sans titre'; $('#clmWho').textContent = `${l.mission ? 'Mission « ' + l.mission + ' » · ' : ''}${listWhen(l)}${l.note ? ' · ' + l.note : ''}`;
+  $('#clmTitle').textContent = l.title || 'Sans titre'; $('#clmWho').textContent = `${l.mission ? 'Mission « ' + l.mission + ' » · ' : ''}${destTags(l).length ? '📍 ' + destTags(l).join(', ') + ' · ' : ''}${listWhen(l)}${l.note ? ' · ' + l.note : ''}`;
   const items = clItems(l), done = items.filter(i => i.done).length;
   $('#clmProg').innerHTML = `<div class="prog big"><i style="width:${items.length ? done / items.length * 100 : 0}%"></i></div><span><b>${done}</b> / ${items.length} prêt${done>1?'s':''}</span>`;
   const cats = [...st.cfg.cats, ...new Set(items.map(i => i.cat).filter(c => !st.cfg.cats.includes(c)))];
@@ -2339,9 +2342,9 @@ $('#clmList').addEventListener('click', e => { const b = e.target.closest('[data
   saveCL(); renderCLM(); });
 $('#clmAdd').addEventListener('submit', e => { e.preventDefault(); const t = $('#clmNew').value.trim(); if (!t) return; const l = getList(clId);
   l.extra.push({ id: 'x' + Date.now().toString(36), cat: $('#clmCat').value, text: t, done: false }); $('#clmNew').value = ''; saveCL(); renderCLM(); });
-$('#clmPrint').addEventListener('click', () => { const l = getList(clId); if (!l) return; const items = clItems(l), cats = [...new Set([...st.cfg.cats, ...items.map(i => i.cat)])].filter(c => items.some(i => i.cat === c));
+$('#clmPrint').addEventListener('click', () => { const l = getList(clId); if (!l) return; const dst = destTags(l); const items = clItems(l), cats = [...new Set([...st.cfg.cats, ...items.map(i => i.cat)])].filter(c => items.some(i => i.cat === c));
   const done = items.filter(i => i.done).length, P = st.perso || {};
-  $('#printArea').innerHTML = `<h1>${esc(l.title || l.mission || 'Check-list')}</h1><p class="pm">${[l.mission && l.mission !== l.title ? 'Mission : ' + esc(l.mission) : '', l.depart ? 'Départ ' + dFr(l.depart) : '', l.retour ? 'retour ' + dFr(l.retour) : '', `${done} / ${items.length} prêts`].filter(Boolean).join(' · ')}${l.note ? '<br>' + esc(l.note) : ''}</p>`
+  $('#printArea').innerHTML = `<h1>${esc(l.title || l.mission || 'Check-list')}</h1><p class="pm">${[l.mission && l.mission !== l.title ? 'Mission : ' + esc(l.mission) : '', dst.length ? 'Destination : ' + esc(dst.join(', ')) : '', l.depart ? 'Départ ' + dFr(l.depart) : '', l.retour ? 'retour ' + dFr(l.retour) : '', `${done} / ${items.length} prêts`].filter(Boolean).join(' · ')}${l.note ? '<br>' + esc(l.note) : ''}</p>`
     + cats.map(c => `<section class="pc"><h2>${esc(c)}</h2><ul>${items.filter(i => i.cat === c).map(i => `<li><span class="bx">${i.done ? '✓' : ''}</span><span class="${i.done ? 'ok' : ''}">${esc(i.text)}</span></li>`).join('')}</ul></section>`).join('')
     + `<div class="pf"><span>${esc([P.prenom, P.nom].filter(Boolean).join(' '))}</span><span>Imprimé le ${new Date().toLocaleDateString('fr-BE')}</span></div>`;
   document.body.classList.add('printing'); const off = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', off); }; window.addEventListener('afterprint', off);
@@ -2617,6 +2620,7 @@ function pickSug(kind, e){
 $('#sug-h').addEventListener('click', e => fillH(pickSug('h', e)));
 function nameInfo(name){ const k = mkey(name); return k ? unusedNames('note').find(x => mkey(x.name) === k) : null; }
 function fillCL(x){ if (!x || !cle) return; const d = cle.draft;
+  for (const t of (st.cfg.dests || [])) if ([x.pays, x.ville].some(v => v && normTxt(v) === normTxt(t.label)) && !d.sel.includes(t.id)) d.sel.push(t.id);
   d.mname = x.name; if (!d.title) d.title = x.ville || x.name; if (!d.depart) d.depart = x.depart; if (!d.retour) d.retour = x.retour; if (!d.note) d.note = x.nature; renderCLE(); }
 function fillMAD(x){ if (!x || !made) return; const d = made.d;
   d.mname = x.name; if (!d.title) d.title = 'MAD ' + x.name; if (!d.dest) d.dest = x.ville; if (!d.date) d.date = x.depart; renderMADE(); }
