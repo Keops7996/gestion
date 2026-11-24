@@ -428,6 +428,10 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 @media (max-width:640px){.kpis.k4{grid-template-columns:1fr 1fr}.kpis.k4 .kpi:nth-child(3){border-left:0}.kpis.k4 .kpi:nth-child(n+3){border-top:1px solid var(--line-2)}}
 .pmis{border:1px solid var(--line-2);border-radius:8px;padding:10px 12px;margin-bottom:8px}.pmis h4{margin:0 0 6px;font-size:14px}
 .grlist{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.grchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 4px 3px 10px;font-size:13px}
+.gaprow{cursor:pointer}.gaprow:hover td,.gaprow.open td{background:color-mix(in srgb,var(--navy) 5%,transparent)}.gapchev{color:var(--ink-2);font-size:11px}
+.gapdet>td{background:color-mix(in srgb,var(--navy) 3%,transparent);padding:4px 16px 16px!important}
+.gaprep h4{margin:16px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}.gaprep h5{margin:0 0 6px;font-size:14px}.gaprep .tablebox{margin:4px 0}.gaprep table.hist{min-width:560px}
+.gapwhy{margin:0;padding-left:18px}.gapwhy li{margin:4px 0}
 .pmis ul{margin:0;padding-left:18px}.pmis li{margin:2px 0}
 </style>
 
@@ -690,7 +694,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
     </section>
     <section class="card">
       <h2>Écarts missions encodées ↔ fiches de paie <span class="tag" id="paieGapN"></span></h2>
-      <div class="body"><p class="note" style="margin-top:0">Heures sup = heures après coefficient, réparties entre récupération et paiement selon ton encodage. Attendu = rémunération mission brut calculée dans Heures Mission. Payé = lignes « Mission » et « Heures sup. » des fiches dont la période tombe pendant la mission (réparti au prorata si plusieurs missions le même mois).</p></div>
+      <div class="body"><p class="note" style="margin-top:0">Heures sup = heures après coefficient, réparties entre récupération et paiement selon ton encodage. Attendu = rémunération mission brut calculée dans Heures Mission. Payé = lignes « Mission » et « Heures sup. » des fiches dont la période tombe pendant la mission (réparti au prorata si plusieurs missions le même mois). <b>Clique sur une mission pour l’analyse détaillée.</b></p></div>
       <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
         <thead><tr><th>Mission</th><th class="num">H. sup (× coef.)</th><th class="num">À récupérer</th><th class="num">Payées</th><th class="num">Payées sur fiche</th><th class="num">Attendu brut</th><th class="num">Payé brut</th><th class="num">Écart</th><th>Statut</th></tr></thead>
         <tbody id="paieGap"></tbody></table></div>
@@ -3296,22 +3300,68 @@ function misList(){
   return out.sort((a, b) => b.depart.localeCompare(a.depart));
 }
 function gapCalc(){
-  const M = misList(), paid = {}, paidH = {}, expM = {};
-  for (const p of st.paies) for (const L of paieCalc(p).mis) { const k = L.per || p.mois; paid[k] = (paid[k] || 0) + (L.mt || 0); if (pcat(L) === 'hs') paidH[k] = (paidH[k] || 0) + (L.h || 0); }
-  { const com = {}; for (const p of st.paies) for (const L of p.comm) { const k = normTxt(L.label); if (L.h && L.per && /\bhs\b|suppl/.test(k) && !/non pay/.test(k)) com[k + '|' + L.per] = Math.max(com[k + '|' + L.per] || 0, L.h); }
-    for (const [kk, h] of Object.entries(com)) { const k = kk.split('|')[1]; paidH[k] = (paidH[k] || 0) + h; if (paid[k] === undefined) paid[k] = 0; } }
+  const M = misList(), paid = {}, paidH = {}, expM = {}, src = {};
+  const add = (k, o) => (src[k] = src[k] || []).push(o);
+  for (const p of st.paies) for (const L of paieCalc(p).mis) { const k = L.per || p.mois, c = pcat(L); paid[k] = (paid[k] || 0) + (L.mt || 0); if (c === 'hs') paidH[k] = (paidH[k] || 0) + (L.h || 0);
+    add(k, { kind: 'line', fiche: p.mois, code: L.code, label: L.label, h: L.h, mt: L.mt || 0, cat: c, countH: c === 'hs' }); }
+  { const com = {}; for (const p of st.paies) for (const L of p.comm) { const k = normTxt(L.label); if (L.h && L.per && /\bhs\b|suppl/.test(k) && !/non pay/.test(k)) { const kk = k + '|' + L.per; (com[kk] = com[kk] || []).push({ fiche: p.mois, label: L.label, h: L.h, per: L.per }); } }
+    for (const arr of Object.values(com)) { const best = arr.reduce((a, b) => b.h > a.h ? b : a); const k = best.per; paidH[k] = (paidH[k] || 0) + best.h; if (paid[k] === undefined) paid[k] = 0;
+      for (const o of arr) add(k, { kind: 'comm', fiche: o.fiche, label: o.label, h: o.h, mt: 0, countH: o === best, dup: o !== best }); } }
   for (const m of M) for (const [k, n] of Object.entries(m.months)) expM[k] = (expM[k] || 0) + m.exp * n / m.n;
   const hsM = {}; for (const m of M) for (const [k, n] of Object.entries(m.months)) hsM[k] = (hsM[k] || 0) + m.hsExp * n / m.n;
-  for (const m of M) { m.paid = 0; m.paidH = 0; m.seen = false;
-    for (const [k, n] of Object.entries(m.months)) { if (paid[k] !== undefined) m.seen = true;
-      const share = expM[k] ? m.exp * n / m.n / expM[k] : 1 / M.filter(o => o.months[k]).length; m.paid += (paid[k] || 0) * share;
-      const hshare = hsM[k] ? m.hsExp * n / m.n / hsM[k] : share; m.paidH += (paidH[k] || 0) * hshare; }
-    m.gap = m.paid - m.exp;
-    const age = (Date.now() - new Date(m.retour + 'T12:00')) / 864e5;
-    m.st = !m.seen ? (age < 75 ? ['wa', 'En attente'] : ['ko', 'Non trouvé sur les fiches']) : Math.abs(m.gap) <= Math.max(5, m.exp * 0.02) ? ['ok', 'OK'] : m.gap < 0 ? ['ko', 'Payé en moins'] : ['wa', 'Payé en plus'];
-    if (m.st[0] === 'ok' && m.hsExp && Math.abs(m.paidH - m.hsExp) > 0.25) m.st = ['wa', `€ OK · ${h2(m.hsExp - m.paidH)} h sup payées non retrouvées sur les fiches`]; }
+  for (const m of M) { m.paid = 0; m.paidH = 0; m.seen = false; m.per = [];
+    for (const [k, n] of Object.entries(m.months).sort()) { if (paid[k] !== undefined) m.seen = true; const others = M.filter(o => o !== m && o.months[k]);
+      const share = expM[k] ? m.exp * n / m.n / expM[k] : 1 / (others.length + 1); m.paid += (paid[k] || 0) * share;
+      const hshare = hsM[k] ? m.hsExp * n / m.n / hsM[k] : share; m.paidH += (paidH[k] || 0) * hshare;
+      m.per.push({ k, n, src: src[k] || [], paid: paid[k] || 0, paidH: paidH[k] || 0, share, hshare, others }); }
+    m.gap = m.paid - m.exp; m.dH = m.hsExp - m.paidH; m.tol = Math.max(5, m.exp * 0.02);
+    m.age = (Date.now() - new Date(m.retour + 'T12:00')) / 864e5;
+    m.st = !m.seen ? (m.age < 75 ? ['wa', 'En attente'] : ['ko', 'Non trouvé sur les fiches']) : Math.abs(m.gap) <= m.tol ? ['ok', 'OK'] : m.gap < 0 ? ['ko', 'Payé en moins'] : ['wa', 'Payé en plus'];
+    if (m.st[0] === 'ok' && m.hsExp && Math.abs(m.dH) > 0.25) m.st = ['wa', m.dH > 0 ? `€ OK · ${h2(m.dH)} h payées absentes des fiches` : `€ OK · ${h2(-m.dH)} h de plus sur les fiches`]; }
   const orph = Object.keys(paid).filter(k => !M.some(m => m.months[k]) && Math.abs(paid[k]) > 0.005).sort().reverse().map(k => ({ k, mt: paid[k] }));
   return { M, orph };
+}
+const gapOpen = new Set();
+function gapReport(m){
+  const x = m.d.sum, part = m.d.params && m.d.params.paiement === 'partiel', raw = x.hs || 0, coef = x.coef || 0, near = (a, b) => Math.abs(a - b) <= 0.25;
+  const dl = rows => `<dl>${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
+  let h = `<div class="gaprep rows">`;
+  h += `<h4>1 · Ce que tu as encodé dans Heures Mission</h4>` + dl([
+    ['Période', `${dFr(m.depart)} → ${dFr(m.retour)} · ${m.n} j (${Object.entries(m.months).sort().map(([k, n]) => `${moisLbl(k)} : ${n} j`).join(', ')})`],
+    ['Heures sup brutes', h2(raw) + ' h'], ['Coefficient', coef ? h2(coef) : '—'], ['Heures sup après coefficient <small>brutes × coef.</small>', `<b>${h2(m.maj)} h</b>`],
+    ['Paiement', part ? 'partiel (une partie en récupération)' : 'intégral'], ['→ à récupérer', h2(m.rec) + ' h'], ['→ à payer <small>après coef. − récup</small>', `<b>${h2(m.hsExp)} h</b>`],
+    ['Rémunération mission brut attendue', `<b>${eur(m.exp)}</b>`]]);
+  h += `<h4>2 · Ce que disent les fiches de paie</h4><p class="note">L’app cherche, sur toutes les fiches importées, les lignes « Mission » et « Heures sup. » dont la <b>période</b> tombe pendant la mission, plus les heures sup de la partie « Communication ».</p>`;
+  for (const P of m.per) {
+    h += `<div class="pmis"><h5>${moisCap(P.k)} <small class="note">(${P.n} j de mission)</small></h5>`;
+    h += P.src.length ? `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Fiche</th><th>Ligne</th><th class="num">Heures</th><th class="num">Montant</th><th>Compté</th></tr></thead><tbody>${P.src.map(o => `<tr><td>${moisLbl(o.fiche)}</td><td>${esc(o.label)}${o.kind === 'comm' ? ' <small class="note">(communication)</small>' : ''}</td><td class="num">${o.h != null ? h2(o.h) : ''}</td><td class="num">${o.mt ? eur(o.mt) : '—'}</td><td>${o.dup ? '<span class="note">non (doublon d’une autre fiche)</span>' : [o.mt ? 'montant' : '', o.countH && o.h ? 'heures' : ''].filter(Boolean).join(' + ') || '<span class="note">montant</span>'}</td></tr>`).join('')}</tbody></table></div>`
+      : `<p class="note pneg" style="margin:4px 0">Aucune ligne trouvée pour cette période${m.age < 75 ? ' (normal si la fiche du mois suivant n’est pas encore là)' : ' : la fiche qui la paie n’est peut-être pas importée'}.</p>`;
+    h += `<p class="note" style="margin:6px 0 0">Total ${moisLbl(P.k)} : ${eur(P.paid)} · ${h2(P.paidH)} h`;
+    if (P.others.length) h += ` — partagé avec ${P.others.map(o => `« ${esc(o.name)} »`).join(', ')} : part de cette mission = ${pct(P.share)} des montants et ${pct(P.hshare)} des heures (au prorata de l’attendu)`;
+    h += `.</p></div>`; }
+  h += `<h4>3 · Le calcul</h4>` + dl([
+    ['Heures sup payées sur les fiches', `${m.per.map(P => h2(P.paidH * P.hshare)).join(' + ')} = <b>${h2(m.paidH)} h</b>`],
+    ['Heures sup à payer encodées', `<b>${h2(m.hsExp)} h</b>`],
+    ['Différence <small>encodé − fiches</small>', `<span class="mark">${m.dH > 0 ? '+' : ''}${h2(m.dH)} h</span>`],
+    ['Payé brut sur les fiches', `${m.per.map(P => eur(P.paid * P.share)).join(' + ')} = <b>${eur(m.paid)}</b>`],
+    ['Écart brut <small>payé − attendu</small>', `${sgn(m.gap, false)} <small class="note">(tolérance ± ${eur(m.tol)})</small>`]]);
+  const why = [];
+  if (!m.seen) why.push(m.age < 75 ? 'Aucune fiche ne paie encore cette période : la mission est récente, attends la fiche suivante.' : 'Aucune fiche importée ne contient de ligne pour cette période. Importe la fiche du mois de la mission et celle du mois suivant (les missions sont souvent payées en rattrapage).');
+  else {
+    why.push(Math.abs(m.gap) <= m.tol ? `Les montants concordent : l’écart (${eur(m.gap)}) est dans la tolérance de ${eur(m.tol)}.` : m.gap < 0 ? `Il manque ${eur(-m.gap)} brut sur les fiches par rapport à l’attendu.` : `Les fiches paient ${eur(m.gap)} brut de plus que l’attendu.`);
+    if (Math.abs(m.dH) > 0.25) {
+      if (m.dH < 0) { why.push(`Les fiches montrent ${h2(-m.dH)} h de plus que les ${h2(m.hsExp)} h à payer que tu as encodées.`);
+        if (m.rec && near(m.paidH, m.maj)) why.push(`${h2(m.paidH)} h = toutes tes heures après coefficient (${h2(m.maj)} h), récup comprise : la fiche compte sans doute aussi les ${h2(m.rec)} h mises en récupération.`); }
+      else { why.push(`Il manque ${h2(m.dH)} h sur les fiches par rapport aux ${h2(m.hsExp)} h à payer encodées.`);
+        if (raw && near(m.paidH, raw * (m.hsExp / (m.maj || 1)))) why.push(`${h2(m.paidH)} h correspond à tes heures <b>avant coefficient</b> : la fiche compte les heures réelles, l’app les heures × ${h2(coef)}.`);
+        else if (raw && near(m.paidH, raw)) why.push(`${h2(m.paidH)} h = tes heures sup brutes (${h2(raw)} h, sans coefficient) : la fiche compte les heures réelles, pas les heures × coefficient.`); }
+      if (m.per.some(P => P.src.some(o => o.kind === 'comm' && o.countH))) why.push('Les heures viennent surtout de la ligne « HS avec réduction fiscale » de la communication : elle ne reprend que les heures qui ont droit à la réduction fiscale (contingent limité), pas forcément toutes les heures payées.');
+      if (Math.abs(m.gap) <= m.tol) why.push('Comme les euros concordent, l’écart d’heures vient très probablement d’une façon différente de compter les heures, pas d’un manque de paiement.'); }
+    if (m.per.some(P => !P.src.length)) why.push('Une partie de la mission n’a aucune ligne sur les fiches : vérifie que toutes les fiches concernées sont importées.');
+  }
+  why.push('Si une ligne de paie de mission est classée « Autre » ou « Salaire », ouvre la fiche et change sa catégorie : le calcul se met à jour.');
+  h += `<h4>4 · Pourquoi ce résultat</h4><ul class="gapwhy">${why.map(w => `<li>${w}</li>`).join('')}</ul></div>`;
+  return h;
 }
 const misOfMonth = k => misList().filter(m => m.months[k]);
 
@@ -3479,12 +3529,13 @@ function renderPAIE(){
     || `<tr><td colspan="7" class="note" style="padding:16px">Aucune fiche pour l’instant : importe un PDF ci-dessus.</td></tr>`;
   const G = gapCalc(), M = G.M.filter(m => paieYear === 'all' || m.depart.startsWith(paieYear) || m.retour.startsWith(paieYear));
   const nko = M.filter(m => m.st[0] !== 'ok').length; $('#paieGapN').textContent = M.length ? (nko ? `${nko} à vérifier` : 'tout est OK') : '';
-  $('#paieGap').innerHTML = M.map(m => `<tr><td><b>${esc(m.name)}</b><span class="sub">${dFr(m.depart)} → ${dFr(m.retour)}</span></td><td class="num">${h2(m.maj)} h</td><td class="num">${h2(m.rec)} h</td><td class="num"><b>${h2(m.hsExp)} h</b></td><td class="num">${m.seen ? h2(m.paidH) + ' h' : '—'}</td><td class="num">${eur(m.exp)}</td><td class="num">${m.seen ? eur(m.paid) : '—'}</td><td class="num">${m.seen ? sgn(m.gap) : '—'}</td><td><span class="pst ${m.st[0]}">${m.st[1]}</span></td></tr>`).join('')
+  $('#paieGap').innerHTML = M.map(m => `<tr data-gid="${esc(m.id)}" class="gaprow${gapOpen.has(m.id) ? ' open' : ''}" title="Cliquer pour l’analyse détaillée"><td><b>${esc(m.name)}</b><span class="sub">${dFr(m.depart)} → ${dFr(m.retour)}</span></td><td class="num">${h2(m.maj)} h</td><td class="num">${h2(m.rec)} h</td><td class="num"><b>${h2(m.hsExp)} h</b></td><td class="num">${m.seen ? h2(m.paidH) + ' h' : '—'}</td><td class="num">${eur(m.exp)}</td><td class="num">${m.seen ? eur(m.paid) : '—'}</td><td class="num">${m.seen ? sgn(m.gap) : '—'}</td><td><span class="pst ${m.st[0]}">${m.st[1]}</span> <span class="gapchev" aria-hidden="true">${gapOpen.has(m.id) ? '▴' : '▾'}</span></td></tr>${gapOpen.has(m.id) ? `<tr class="gapdet"><td colspan="9">${gapReport(m)}</td></tr>` : ''}`).join('')
     || `<tr><td colspan="9" class="note" style="padding:16px">Aucune mission encodée dans Heures Mission${paieYear !== 'all' ? ' pour ' + paieYear : ''}.</td></tr>`;
   $('#paieOrph').innerHTML = G.orph.length ? `<div class="warn"><b>Lignes mission / HS sans mission encodée :</b> ${G.orph.map(o => `${moisLbl(o.k)} (${eur(o.mt)})`).join(', ')}. Encode la mission dans Heures Mission, ou change la catégorie de la ligne si ce n’est pas une mission.</div>` : '';
   $('#paieOrph').hidden = !G.orph.length;
   renderGrille(L);
 }
+$('#paieGap').addEventListener('click', e => { const tr = e.target.closest('tr[data-gid]'); if (!tr) return; const id = tr.dataset.gid; gapOpen.has(id) ? gapOpen.delete(id) : gapOpen.add(id); renderPAIE(); });
 $('#paieYear').addEventListener('change', e => { paieYear = e.target.value; renderPAIE(); });
 $('#grBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-pid]'); if (!tr) return; paieId = tr.dataset.pid; go('paied'); });
 $('#paieBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-pid]'); if (!tr) return; paieId = tr.dataset.pid; go('paied'); });
