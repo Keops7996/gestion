@@ -2203,7 +2203,7 @@ function guessSel(text){
 const getList = id => st.lists.find(l => l.id === id);
 function clItems(cl){
   const items = st.cfg.items.filter(it => !cl.off[it.id] && (!it.tags.length || it.tags.some(t => cl.sel.includes(t))));
-  return [...items.map(it => ({ id: it.id, cat: it.cat, text: it.text, done: !!cl.done[it.id] })), ...cl.extra.map(x => ({ id: x.id, cat: x.cat, text: x.text, done: !!x.done, extra: true }))];
+  return [...items.map(it => ({ id: it.id, cat: it.cat, text: it.text, done: !!cl.done[it.id] })), ...cl.extra.map(x => ({ id: x.id, cat: x.cat, text: x.text, done: !!x.done, extra: true }))].sort((a, b) => String(a.text || '').localeCompare(String(b.text || ''), 'fr', { sensitivity: 'base', numeric: true }));
 }
 function saveCL(){ const l = getList(clId); if (l) l.updated = new Date().toISOString(); Store.saveProfil(); }
 // reprise des check-lists créées dans la version précédente (liées aux missions)
