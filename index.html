@@ -694,7 +694,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
     </section>
     <section class="card">
       <h2>Écarts missions encodées ↔ fiches de paie <span class="tag" id="paieGapN"></span></h2>
-      <div class="body"><p class="note" style="margin-top:0">Heures sup = heures après coefficient, réparties entre récupération et paiement selon ton encodage. Attendu = rémunération mission brut calculée dans Heures Mission. Payé = lignes « Mission » et « Heures sup. » des fiches dont la période tombe pendant la mission (réparti au prorata si plusieurs missions le même mois). <b>Clique sur une mission pour l’analyse détaillée.</b></p></div>
+      <div class="body"><p class="note" style="margin-top:0">Heures sup = heures après coefficient, réparties entre récupération et paiement selon ton encodage. Attendu = rémunération mission brut calculée dans Heures Mission. Payé = lignes « Mission » et « Heures sup. » des fiches dont la période tombe pendant la mission (réparti au prorata si plusieurs missions le même mois). Les fiches doivent contenir au moins les heures sup de la mission ; un surplus est compté comme heures sup régulières (hors mission). <b>Clique sur une mission pour l’analyse détaillée.</b></p></div>
       <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
         <thead><tr><th>Mission</th><th class="num">H. sup (× coef.)</th><th class="num">À récupérer</th><th class="num">Payées</th><th class="num">Payées sur fiche</th><th class="num">Attendu brut</th><th class="num">Payé brut</th><th class="num">Écart</th><th>Statut</th></tr></thead>
         <tbody id="paieGap"></tbody></table></div>
@@ -3317,7 +3317,9 @@ function gapCalc(){
     m.gap = m.paid - m.exp; m.dH = m.hsExp - m.paidH; m.tol = Math.max(5, m.exp * 0.02);
     m.age = (Date.now() - new Date(m.retour + 'T12:00')) / 864e5;
     m.st = !m.seen ? (m.age < 75 ? ['wa', 'En attente'] : ['ko', 'Non trouvé sur les fiches']) : Math.abs(m.gap) <= m.tol ? ['ok', 'OK'] : m.gap < 0 ? ['ko', 'Payé en moins'] : ['wa', 'Payé en plus'];
-    if (m.st[0] === 'ok' && m.hsExp && Math.abs(m.dH) > 0.25) m.st = ['wa', m.dH > 0 ? `€ OK · ${h2(m.dH)} h payées absentes des fiches` : `€ OK · ${h2(-m.dH)} h de plus sur les fiches`]; }
+    m.reg = m.seen && m.dH < -0.25 ? -m.dH : 0;           // surplus d'heures = heures sup régulières (hors mission)
+    if (m.seen && m.hsExp && m.dH > 0.25) m.st = ['ko', `${h2(m.dH)} h sup de mission manquantes`];
+    else if (m.reg) m.st = m.st[0] === 'ok' ? ['ok', `OK · + ${h2(m.reg)} h sup régulières`] : m.gap > 0 ? ['wa', `Payé en plus · ${h2(m.reg)} h sup régulières ?`] : [m.st[0], `${m.st[1]} · + ${h2(m.reg)} h sup régulières`]; }
   const orph = Object.keys(paid).filter(k => !M.some(m => m.months[k]) && Math.abs(paid[k]) > 0.005).sort().reverse().map(k => ({ k, mt: paid[k] }));
   return { M, orph };
 }
@@ -3342,7 +3344,8 @@ function gapReport(m){
   h += `<h4>3 · Le calcul</h4>` + dl([
     ['Heures sup payées sur les fiches', `${m.per.map(P => h2(P.paidH * P.hshare)).join(' + ')} = <b>${h2(m.paidH)} h</b>`],
     ['Heures sup à payer encodées', `<b>${h2(m.hsExp)} h</b>`],
-    ['Différence <small>encodé − fiches</small>', `<span class="mark">${m.dH > 0 ? '+' : ''}${h2(m.dH)} h</span>`],
+    ['Règle <small>fiches ≥ mission</small>', m.dH > 0.25 ? `<span class="pneg">non respectée : ${h2(m.dH)} h de mission manquantes</span>` : `<span class="ppos">respectée</span>`],
+    ...(m.reg ? [['Surplus → heures sup régulières (hors mission) <small>fiches − mission</small>', `<span class="mark">${h2(m.reg)} h</span>`]] : []),
     ['Payé brut sur les fiches', `${m.per.map(P => eur(P.paid * P.share)).join(' + ')} = <b>${eur(m.paid)}</b>`],
     ['Écart brut <small>payé − attendu</small>', `${sgn(m.gap, false)} <small class="note">(tolérance ± ${eur(m.tol)})</small>`]]);
   const why = [];
@@ -3350,13 +3353,14 @@ function gapReport(m){
   else {
     why.push(Math.abs(m.gap) <= m.tol ? `Les montants concordent : l’écart (${eur(m.gap)}) est dans la tolérance de ${eur(m.tol)}.` : m.gap < 0 ? `Il manque ${eur(-m.gap)} brut sur les fiches par rapport à l’attendu.` : `Les fiches paient ${eur(m.gap)} brut de plus que l’attendu.`);
     if (Math.abs(m.dH) > 0.25) {
-      if (m.dH < 0) { why.push(`Les fiches montrent ${h2(-m.dH)} h de plus que les ${h2(m.hsExp)} h à payer que tu as encodées.`);
+      if (m.dH < 0) { why.push(`Les fiches montrent ${h2(-m.dH)} h de plus que les ${h2(m.hsExp)} h de mission à payer : toutes les heures de mission sont retrouvées, le surplus est compté comme <b>heures sup régulières</b> (prestées hors mission le même mois). Ce n’est pas une anomalie.`);
+        if (m.gap > m.tol) why.push(`Le brut payé en plus (${eur(m.gap)}) peut correspondre au paiement de ces ${h2(m.reg)} h régulières s’il est sur la même ligne que la mission.`);
         if (m.rec && near(m.paidH, m.maj)) why.push(`${h2(m.paidH)} h = toutes tes heures après coefficient (${h2(m.maj)} h), récup comprise : la fiche compte sans doute aussi les ${h2(m.rec)} h mises en récupération.`); }
-      else { why.push(`Il manque ${h2(m.dH)} h sur les fiches par rapport aux ${h2(m.hsExp)} h à payer encodées.`);
+      else { why.push(`<b>Anomalie :</b> les fiches doivent contenir au minimum les ${h2(m.hsExp)} h sup de la mission, or il en manque ${h2(m.dH)} h.`);
         if (raw && near(m.paidH, raw * (m.hsExp / (m.maj || 1)))) why.push(`${h2(m.paidH)} h correspond à tes heures <b>avant coefficient</b> : la fiche compte les heures réelles, l’app les heures × ${h2(coef)}.`);
         else if (raw && near(m.paidH, raw)) why.push(`${h2(m.paidH)} h = tes heures sup brutes (${h2(raw)} h, sans coefficient) : la fiche compte les heures réelles, pas les heures × coefficient.`); }
       if (m.per.some(P => P.src.some(o => o.kind === 'comm' && o.countH))) why.push('Les heures viennent surtout de la ligne « HS avec réduction fiscale » de la communication : elle ne reprend que les heures qui ont droit à la réduction fiscale (contingent limité), pas forcément toutes les heures payées.');
-      if (Math.abs(m.gap) <= m.tol) why.push('Comme les euros concordent, l’écart d’heures vient très probablement d’une façon différente de compter les heures, pas d’un manque de paiement.'); }
+      if (m.dH > 0 && Math.abs(m.gap) <= m.tol) why.push('Les euros concordent pourtant : vérifie si la fiche compte les heures autrement (sans coefficient, ou seulement celles avec réduction fiscale) avant de réclamer.'); }
     if (m.per.some(P => !P.src.length)) why.push('Une partie de la mission n’a aucune ligne sur les fiches : vérifie que toutes les fiches concernées sont importées.');
   }
   why.push('Si une ligne de paie de mission est classée « Autre » ou « Salaire », ouvre la fiche et change sa catégorie : le calcul se met à jour.');
