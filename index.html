@@ -415,6 +415,19 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 #tirYears,#tirArmes{margin:0}
 .impinfo{margin:0;font-size:13px;padding:8px 12px;border-radius:8px;background:var(--sheet);border:1px solid var(--line)}
 .impinfo.ok{color:var(--good)}.impinfo.err{color:var(--bad)}
+.paiedrop{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1.5px dashed var(--line);border-radius:var(--r);padding:14px}
+.paiedrop.over{border-color:var(--navy);background:color-mix(in srgb,var(--navy) 6%,transparent)}
+.paiet td.num,.paiet th.num{text-align:right;font-family:var(--f-mono);white-space:nowrap}
+.paiet tbody tr[data-pid]{cursor:pointer}.paiet tbody tr[data-pid]:hover td{background:color-mix(in srgb,var(--navy) 5%,transparent)}
+.paiet .sub{display:block;font-size:12px;color:var(--ink-2)}
+.pcat{border:1px solid var(--line);background:var(--sheet);color:var(--ink);border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+.pcat[data-c=mission]{border-color:var(--navy);color:var(--navy)}.pcat[data-c=hs]{border-color:var(--good);color:var(--good)}
+.pst{font-size:12px;font-weight:600;white-space:nowrap}.pst.ok{color:var(--good)}.pst.ko{color:var(--bad)}.pst.wa{color:var(--warn)}
+.pneg{color:var(--bad)}.ppos{color:var(--good)}
+.kpis.k4{grid-template-columns:repeat(4,1fr)}.kpis.k4 .kpi:nth-child(3){border-left:1px solid var(--line-2)}.kpis.k4 .kpi:nth-child(n+3){border-top:0}
+@media (max-width:640px){.kpis.k4{grid-template-columns:1fr 1fr}.kpis.k4 .kpi:nth-child(3){border-left:0}.kpis.k4 .kpi:nth-child(n+3){border-top:1px solid var(--line-2)}}
+.pmis{border:1px solid var(--line-2);border-radius:8px;padding:10px 12px;margin-bottom:8px}.pmis h4{margin:0 0 6px;font-size:14px}
+.pmis ul{margin:0;padding-left:18px}.pmis li{margin:2px 0}
 </style>
 
 <div class="wrap">
@@ -485,6 +498,12 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
         <span class="t">Carnet de tir</span>
         <span class="d">Tirs effectués : arme, essai, coups, signature de l’examinateur.</span>
         <span class="s" id="appTirStat"></span>
+      </button>
+      <button type="button" class="app" data-app="paie">
+        <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l4 4v16H6z"/><path d="M14 2v5h5"/><path d="M9 12h7M9 16h7M9 8h3"/></svg></span>
+        <span class="t">Fiches de paie</span>
+        <span class="d">Analyse des fiches : missions payées, impôt, écarts avec tes encodages.</span>
+        <span class="s" id="appPaieStat"></span>
       </button>
       <button type="button" class="app" data-app="tbc">
         <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v5M15 2v5"/><path d="M6 7h12v4a6 6 0 0 1-12 0z"/><path d="M12 17v5"/></svg></span>
@@ -635,6 +654,40 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
     <div class="hometop"><h2>Mes notes <span class="note" id="notesCount" style="font-weight:400;font-size:13px"></span></h2><input id="notesSearch" placeholder="Rechercher…" aria-label="Rechercher dans les notes" style="max-width:240px"></div>
     <div class="notelist" id="notesBody"></div>
     <div class="empty card" id="notesEmpty" hidden></div>
+  </div>
+
+  <!-- Fiches de paie -->
+  <div class="page" data-page="paie" hidden>
+    <section class="card">
+      <div class="body">
+        <div class="paiedrop" id="paieDrop">
+          <div><b>Importer des fiches de paie (PDF)</b><div class="note">Glisse les PDF ici ou choisis-les. Lecture dans l’app, hors ligne : seules les lignes de paie sont gardées (ni n° national, ni adresse, ni compte).</div></div>
+          <button type="button" class="btn" id="paieImpBtn">Choisir des PDF…</button>
+          <input type="file" id="paieFile" accept="application/pdf,.pdf" multiple hidden>
+        </div>
+        <div id="paieMsg" class="warns" style="margin-top:8px"></div>
+      </div>
+    </section>
+    <div class="hometop"><h2>Mes fiches <span class="note" id="paieCount" style="font-weight:400;font-size:13px"></span></h2><select id="paieYear" aria-label="Année" style="max-width:140px"></select></div>
+    <section class="card"><div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
+      <thead><tr><th>Mois</th><th class="num">Brut</th><th class="num">Imposable</th><th class="num">Précompte</th><th class="num">Net</th><th class="num">Missions / HS</th><th>Payé pour</th></tr></thead>
+      <tbody id="paieBody"></tbody></table></div></section>
+    <section class="card">
+      <h2>Écarts missions encodées ↔ fiches de paie <span class="tag" id="paieGapN"></span></h2>
+      <div class="body"><p class="note" style="margin-top:0">Attendu = rémunération mission brut calculée dans Heures Mission. Payé = lignes « Mission » et « Heures sup. » des fiches dont la période tombe pendant la mission (réparti au prorata si plusieurs missions le même mois).</p></div>
+      <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
+        <thead><tr><th>Mission</th><th class="num">H. sup encodées</th><th class="num">H. sup payées</th><th class="num">Attendu brut</th><th class="num">Payé brut</th><th class="num">Écart</th><th>Statut</th></tr></thead>
+        <tbody id="paieGap"></tbody></table></div>
+      <div class="body" id="paieOrph"></div>
+    </section>
+  </div>
+  <div class="page" data-page="paied" hidden>
+    <div class="hometop"><h2 id="pdTitle"></h2><div style="display:flex;gap:8px"><button type="button" class="btn small" id="pdBack">← Mes fiches</button><button type="button" class="btn small" id="pdDel">Supprimer</button></div></div>
+    <section class="card"><div class="kpis k4" id="pdKpi"></div></section>
+    <section class="card"><h2>Payé ce mois pour tes missions</h2><div class="body" id="pdMis"></div></section>
+    <section class="card"><h2>Impôt et retenues</h2><div class="body rows" id="pdTax"></div></section>
+    <section class="card"><h2>Toutes les lignes <span class="tag">clique sur la catégorie pour la changer</span></h2>
+      <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet"><thead><tr><th>Code</th><th>Libellé</th><th>Période</th><th class="num">Heures</th><th class="num">Jours</th><th class="num">Montant</th><th>Catégorie</th></tr></thead><tbody id="pdLines"></tbody></table></div></section>
   </div>
 
   <!-- Carnet de tir -->
@@ -1252,6 +1305,7 @@ const st = {
   mads: prof.mads || null,
   notes: prof.notes || null,
   tirs: prof.tirs || null,
+  paies: prof.paies || null,
   mission: emptyMission(), params: null, days: {}
 };
 const freshParams = () => ({resp: !!st.perso.resp, senior: !!st.perso.senior, recup:'', recue:'', paiement:'integral', recupMax:false, deduire:'', risque:'', helico:'', remarques:''});
@@ -1296,7 +1350,7 @@ const FS = {
   removeItem(c, id){ return this.cdir(c).then(d => d.removeEntry(id + '.json')).catch(() => {}); }
 };
 /* collections des outils : un fichier / document par élément */
-const COLS = ['notes', 'mads', 'lists', 'tirs'];
+const COLS = ['notes', 'mads', 'lists', 'tirs', 'paies'];
 const lastW = {};            // dernière version écrite ou lue de chaque élément
 const known = {};            // ids présents dans le stockage (dossier ou base) à la dernière lecture
 const knownSet = c => known[c] || (known[c] = new Set(rd(KEY_S + '-' + c) || []));
@@ -1305,6 +1359,7 @@ const isEditing = sel => { const a = document.activeElement; return !!(a && a.cl
 function refreshToolView(){
   if (step === 'notes' && !isEditing('#notesBody')) renderNOTES();
   if (step === 'tir' && !isEditing('[data-page="tir"]')) renderTIR();
+  if (step === 'paie') renderPAIE(); if (step === 'paied') renderPAIED();
   if (step === 'mad') renderMAD(); if (step === 'madm' && !isEditing('#madRows')) renderMADM();
   if (step === 'cl') renderCL(); if (step === 'clm') renderCLM();
   if (step === 'sum') renderSUM(); if (step === 'sumd') renderSUMD(); if (step === 'apps') renderApps();
@@ -1332,13 +1387,13 @@ const Store = {
         const p = await this.profRef.get();
         if (p.exists) { const d = p.data(); Object.assign(st.perso, d.perso || {}); Object.assign(st.sign, d.sign || {}); if (d.cfg) st.cfg = JSON.parse(JSON.stringify(d.cfg));
           for (const c of COLS) if (Array.isArray(d[c])) for (const x of d[c]) if (x && x.id && !st[c].some(y => y.id === x.id)) st[c].push(JSON.parse(JSON.stringify(x)));
-          wr(KEY_P, {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs}); fillFields(); update();
+          wr(KEY_P, {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, paies: st.paies}); fillFields(); update();
           if (COLS.some(c => Array.isArray(d[c]))) await this.profRef.set({perso: {...st.perso}, sign: {...st.sign}, cfg: st.cfg}); }
         else await this.profRef.set({perso: {...st.perso}, sign: {...st.sign}, cfg: st.cfg});
       } catch(e) {}
       try {
         for (const c of COLS) this.profRef.collection(c).onSnapshot(snap => {
-          if (mergeCol(c, new Map(snap.docs.map(d => [d.id, d.data()])))) { wr(KEY_P, {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs}); refreshToolView(); }
+          if (mergeCol(c, new Map(snap.docs.map(d => [d.id, d.data()])))) { wr(KEY_P, {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, paies: st.paies}); refreshToolView(); }
           this.saveCols();
         }, () => {});
       } catch(e) {}
@@ -1398,7 +1453,7 @@ const Store = {
     if (prof && prof.perso && (!profUpd || (prof.updated || '') > profUpd)) {
       if (prof.cfg) st.cfg = prof.cfg;
       if (JSON.stringify(prof.perso) !== JSON.stringify(st.perso) || JSON.stringify(prof.sign || {}) !== JSON.stringify(st.sign)) { Object.assign(st.perso, prof.perso); Object.assign(st.sign, prof.sign || {}); if (step !== 0) fillFields(); }
-      profUpd = prof.updated || ''; wr(KEY_P, {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, updated: profUpd});
+      profUpd = prof.updated || ''; wr(KEY_P, {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, paies: st.paies, updated: profUpd});
     } else if (!prof || (profUpd || '') > (prof.updated || '')) await FS.saveProfil({perso: st.perso, sign: st.sign, cfg: st.cfg, updated: profUpd || new Date().toISOString()});
     let changed = false;
     for (const c of COLS) {
@@ -1407,7 +1462,7 @@ const Store = {
       if (mergeCol(c, remote)) changed = true;
     }
     if (prof && COLS.some(c => Array.isArray(prof[c]))) await FS.saveProfil({perso: st.perso, sign: st.sign, cfg: st.cfg, updated: prof.updated || profUpd || new Date().toISOString()});
-    wr(KEY_P, {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, updated: profUpd});
+    wr(KEY_P, {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, paies: st.paies, updated: profUpd});
     this.saveCols();
     if (changed) refreshToolView();
     FS.last = new Date();
@@ -1420,7 +1475,7 @@ const Store = {
     const wk = t.getUTCFullYear() + '-S' + String(Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7)).padStart(2, '0');
     if (this.bkWeek === wk) return; const bd = await FS.dir.getDirectoryHandle('backup', { create: true }); const name = `sauvegarde_${wk}.zip`;
     try { await bd.getFileHandle(name); this.bkWeek = wk; return; } catch(e) {}
-    const zip = new JSZip(); zip.file('donnees.json', JSON.stringify({ app: 'mission-v9', version: 1, exported: new Date().toISOString(), profil: { perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs }, missions: Object.fromEntries(this.missions) }, null, 1));
+    const zip = new JSZip(); zip.file('donnees.json', JSON.stringify({ app: 'mission-v9', version: 1, exported: new Date().toISOString(), profil: { perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, paies: st.paies }, missions: Object.fromEntries(this.missions) }, null, 1));
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' }); const fh = await bd.getFileHandle(name, { create: true }); const w = await fh.createWritable(); await w.write(blob); await w.close();
     this.bkWeek = wk; const all = []; for await (const [n, h] of bd.entries()) if (h.kind === 'file' && /^sauvegarde_\d{4}-S\d{2}\.zip$/.test(n)) all.push(n);
     all.sort().reverse().slice(8).forEach(n => bd.removeEntry(n).catch(() => {}));
@@ -1464,7 +1519,7 @@ const Store = {
   },
   saveProfil(){
     profUpd = new Date().toISOString();
-    wr(KEY_P, {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, updated: profUpd});
+    wr(KEY_P, {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, paies: st.paies, updated: profUpd});
     const body = {perso: {...st.perso}, sign: {...st.sign}, cfg: st.cfg, updated: profUpd};
     if (this.mode === 'db') this.write('profil', () => this.profRef.set(body));
     else if (FS.dir) this.write('f:profil', () => FS.saveProfil(body));
@@ -1501,7 +1556,7 @@ function undoToast(msg, restore){ let el = $('#undoToast'); if (!el) { el = docu
   undoToast.t = setTimeout(() => { el.hidden = true; }, 6000); }
 function saveState(t){ const el = $('#saveState'); el.textContent = t; clearTimeout(saveState.t); saveState.t = setTimeout(() => el.textContent = '', 2500); }
 function buildDoc(src, meta){
-  const tmp = {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, mission: {...emptyMission(), ...src.mission}, params: {...freshParams(), ...src.params}, days: src.days || {}};
+  const tmp = {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, paies: st.paies, mission: {...emptyMission(), ...src.mission}, params: {...freshParams(), ...src.params}, days: src.days || {}};
   const R = compute(withProfile(tmp), DATA.countries), m = tmp.mission;
   const withRec = tmp.params.paiement === 'partiel' && R.G5 > 0;
   const now = new Date().toISOString();
@@ -1591,13 +1646,13 @@ function go(n){
   step = n;
   $$('.page').forEach(p => p.hidden = p.dataset.page !== String(n));
   $('#steps').hidden = !(typeof n === 'number' && n >= 1);
-  tool = (n === 'apps' || n === 0) ? null : ['tbc','tbq','tbt'].includes(n) ? n : (['cl','clm','clc','cle'].includes(n) ? 'cl' : ['mad','madm','made'].includes(n) ? 'mad' : ['sum','sumd'].includes(n) ? 'sum' : ['notes','note'].includes(n) ? 'notes' : n === 'tir' ? 'tir' : n === 'exp' ? 'exp' : 'h');
+  tool = (n === 'apps' || n === 0) ? null : ['tbc','tbq','tbt'].includes(n) ? n : (['cl','clm','clc','cle'].includes(n) ? 'cl' : ['mad','madm','made'].includes(n) ? 'mad' : ['sum','sumd'].includes(n) ? 'sum' : ['notes','note'].includes(n) ? 'notes' : n === 'tir' ? 'tir' : ['paie','paied'].includes(n) ? 'paie' : n === 'exp' ? 'exp' : 'h');
   updateNames();
-  $('#homeBtn').hidden = !tool || n === 'h' || tool === 'cl' || n === 'mad' || n === 'sum' || n === 'notes' || n === 'tir' || n === 'exp' || ['tbc','tbq','tbt'].includes(n);
+  $('#homeBtn').hidden = !tool || n === 'h' || tool === 'cl' || n === 'mad' || n === 'sum' || n === 'notes' || n === 'tir' || n === 'exp' || tool === 'paie' || ['tbc','tbq','tbt'].includes(n);
   $('#homeBtn').textContent = tool === 'cl' ? 'Mes check-lists' : tool === 'mad' ? 'Mes MAD' : tool === 'notes' ? 'Mes notes' : tool === 'sum' ? 'Toutes les missions' : 'Mes missions';
   $('#appsBtn').hidden = !tool;
   $('#gearBtn').hidden = true; $('#appsOrg').hidden = n !== 'apps'; if (n !== 'apps' && appsOrg) { appsOrg = false; } $('#brandLogo').hidden = n !== 'apps';
-  const ttl = !tool ? 'Outils Mission' : tool === 'cl' ? 'Check-list voyage' : tool === 'mad' ? 'MAD – mise à disposition' : tool === 'notes' ? 'Notes' : tool === 'tir' ? 'Carnet de tir' : tool === 'exp' ? 'Import / Export' : tool === 'tbc' ? 'Connecteurs' : tool === 'tbq' ? 'Couples de serrage' : tool === 'tbt' ? 'Balistique' : tool === 'sum' ? 'Résumé par mission' : 'Heures Mission';
+  const ttl = !tool ? 'Outils Mission' : tool === 'cl' ? 'Check-list voyage' : tool === 'mad' ? 'MAD – mise à disposition' : tool === 'notes' ? 'Notes' : tool === 'tir' ? 'Carnet de tir' : tool === 'paie' ? 'Fiches de paie' : tool === 'exp' ? 'Import / Export' : tool === 'tbc' ? 'Connecteurs' : tool === 'tbq' ? 'Couples de serrage' : tool === 'tbt' ? 'Balistique' : tool === 'sum' ? 'Résumé par mission' : 'Heures Mission';
   document.querySelector('.wrap').classList.toggle('widewrap', n === 'madm');
   $('#appTitle').textContent = ttl; document.title = ttl;
   if (['tbc','tbq','tbt'].includes(n)) openTB(n);
@@ -1619,6 +1674,8 @@ function go(n){
   if (n === 'notes') renderNOTES();
   if (n === 'note') renderNOTE();
   if (n === 'tir') renderTIR();
+  if (n === 'paie') renderPAIE();
+  if (n === 'paied') renderPAIED();
   if (n === 'exp') renderEXP();
   $$('#steps button').forEach(b => {
     const k = +b.dataset.go; b.setAttribute('aria-current', k === n ? 'step' : 'false');
@@ -1976,7 +2033,7 @@ $('#dbBtn').addEventListener('click', async () => {
 
 /* ---- sauvegarde ---- */
 $('#backupBtn').addEventListener('click', async () => {
-  const body = { app: 'mission-v9', version: 1, exported: new Date().toISOString(), profil: {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs}, missions: Object.fromEntries(Store.missions) };
+  const body = { app: 'mission-v9', version: 1, exported: new Date().toISOString(), profil: {perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, paies: st.paies}, missions: Object.fromEntries(Store.missions) };
   try { await saveFile(`Heures_Mission_sauvegarde_${todayIso()}.json`, new Blob([JSON.stringify(body, null, 2)], {type: 'application/json'})); } catch(e) {}
 });
 
@@ -3107,6 +3164,210 @@ const expTirP = async () => {
 $('#tirPdf').addEventListener('click', expTirP);
 
 
+/* ===================== Outil 8 : Fiches de paie ===================== */
+if (!Array.isArray(st.paies)) st.paies = [];
+const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const moisLbl = ym => { const [y, m] = String(ym || '').split('-'); return m ? `${MOIS_FR[+m - 1]} ${y}` : '—'; };
+const moisCap = ym => { const s = moisLbl(ym); return s.charAt(0).toUpperCase() + s.slice(1); };
+const PCATS = { mission: 'Mission', hs: 'Heures sup.', base: 'Salaire', autre: 'Autre' };
+const PCYCLE = ['mission', 'hs', 'base', 'autre'];
+const pnum = s => { s = String(s || '').trim(); if (!/^-?[\d.]*\d(,\d+)?-?$/.test(s)) return null; const neg = s.endsWith('-') || s.startsWith('-'); const v = parseFloat(s.replace(/-/g, '').replace(/\./g, '').replace(',', '.')); return isFinite(v) ? (neg ? -v : v) : null; };
+const pct = x => isFinite(x) ? (x * 100).toLocaleString('fr-BE', { maximumFractionDigits: 1 }) + ' %' : '—';
+let paieId = null, paieYear = '';
+
+/* --- lecture du PDF (texte positionné), 100 % locale --- */
+async function pdfTextItems(buf){
+  const doc = await PDFLib.PDFDocument.load(buf, { ignoreEncryption: true, updateMetadata: false });
+  const dec = new TextDecoder('windows-1252'), items = [];
+  doc.getPages().forEach((pg, pi) => {
+    let c = pg.node.lookup(PDFLib.PDFName.of('Contents')); const parts = [];
+    if (c instanceof PDFLib.PDFArray) for (let i = 0; i < c.size(); i++) parts.push(c.lookup(i)); else if (c) parts.push(c);
+    let src = '';
+    for (const s of parts) { let bytes = null;
+      try { if (s instanceof PDFLib.PDFRawStream) bytes = PDFLib.decodePDFRawStream(s).decode(); else if (s.getContents) bytes = s.getContents(); } catch(e) {}
+      if (bytes) { let t = ''; for (let i = 0; i < bytes.length; i++) t += String.fromCharCode(bytes[i]); src += t + '\n'; } }
+    const re = /\bBT\b|\bET\b|(-?[\d.]+)\s+(-?[\d.]+)\s+T[dD]\b|(?:-?[\d.]+\s+){4}(-?[\d.]+)\s+(-?[\d.]+)\s+Tm\b|<([0-9A-Fa-f\s]*)>\s*Tj|\(((?:\\.|[^\\)])*)\)\s*Tj|\[((?:\\.|[^\]])*)\]\s*TJ/g;
+    let x = 0, y = 0, m;
+    const lit = s => s.replace(/\\(\d{1,3}|.)/g, (_, e) => /^\d/.test(e) ? String.fromCharCode(parseInt(e, 8)) : ({ n: '\n', r: '\r', t: '\t', b: '\b', f: '\f' }[e] ?? e));
+    const hex = h => { h = h.replace(/\s/g, ''); let t = ''; for (let i = 0; i < h.length; i += 2) t += String.fromCharCode(parseInt(h.substr(i, 2).padEnd(2, '0'), 16)); return t; };
+    const push = raw => { const b = Uint8Array.from(raw, ch => ch.charCodeAt(0) & 255); const t = dec.decode(b); if (t.trim()) items.push({ x, y: y - pi * 2000, t }); };
+    while ((m = re.exec(src))) {
+      if (m[0] === 'BT') { x = 0; y = 0; }
+      else if (m[1] !== undefined) { x += +m[1]; y += +m[2]; }
+      else if (m[3] !== undefined) { x = +m[3]; y = +m[4]; }
+      else if (m[5] !== undefined) push(hex(m[5]));
+      else if (m[6] !== undefined) push(lit(m[6]));
+      else if (m[7] !== undefined) { let t = ''; m[7].replace(/<([0-9A-Fa-f\s]*)>|\(((?:\\.|[^\\)])*)\)/g, (_, h, l) => { t += h !== undefined ? hex(h) : lit(l); return ''; }); push(t); }
+    }
+  });
+  return items;
+}
+function parsePaie(items){
+  const rows = []; for (const it of [...items].sort((a, b) => b.y - a.y || a.x - b.x)) { const r = rows.find(r => Math.abs(r.y - it.y) < 3); if (r) r.c.push(it); else rows.push({ y: it.y, c: [it] }); }
+  rows.forEach(r => r.c.sort((a, b) => a.x - b.x));
+  const all = rows.flatMap(r => r.c.map(c => c.t.trim()));
+  let mois = ''; for (const t of all) { const mm = normTxt(t).match(/^(janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\s+(\d{4})$/); if (mm) { mois = mm[2] + '-' + String(MOIS_FR.map(normTxt).indexOf(mm[1]) + 1).padStart(2, '0'); } }
+  if (!mois || !all.some(t => /FICHE DE PAIE/i.test(t))) throw new Error('format');
+  let cols = { h: 300, j: 380, t: 460, m: 514 };
+  const hd = rows.find(r => r.c.some(c => /^MONTANT$/i.test(c.t.trim())));
+  if (hd) for (const c of hd.c) { const k = normTxt(c.t); if (k === 'heures') cols.h = c.x; if (k === 'jours') cols.j = c.x; if (k === 'taux') cols.t = c.x; if (k === 'montant') cols.m = c.x; }
+  const lims = [(cols.h + cols.j) / 2, (cols.j + cols.t) / 2, (cols.t + cols.m) / 2];
+  let sec = 'pre'; const lines = [], comm = [], tot = {};
+  for (const r of rows) {
+    const txt = r.c.map(c => c.t.trim()).join(' ');
+    if (/^Communication$/i.test(txt)) { sec = 'comm'; continue; }
+    if (/FICHE DE PAIE/i.test(txt)) { sec = 'wait'; continue; }
+    if (sec === 'wait') { if (hd && r === hd) sec = 'brut'; continue; }
+    if (sec === 'pre' || sec === 'end') continue;
+    const L = { code: '', label: '', per: '', h: null, j: null, taux: null, mt: null };
+    for (const c of r.c) { const t = c.t.trim(); if (!t) continue;
+      if (/^\d{2}\/\d{4}$/.test(t)) { L.per = t.slice(3) + '-' + t.slice(0, 2); continue; }
+      const v = pnum(t);
+      if (v !== null && c.x > lims[0] - 60) { if (c.x < lims[0]) L.h = v; else if (c.x < lims[1]) L.j = v; else if (c.x < lims[2]) L.taux = v; else L.mt = v; continue; }
+      if (c.x < 45 && /^[\/0-9A-Z]{2,6}$/.test(t) && !L.label) { L.code = t; continue; }
+      L.label = (L.label + ' ' + t).trim(); }
+    if (sec === 'comm') { if (L.label || L.per) comm.push(L); continue; }
+    const k = normTxt(L.label);
+    if (k === 'brut onss') { tot.brut = L.mt; sec = 'imp'; continue; }
+    if (k === 'imposable') { tot.imposable = L.mt; sec = 'net'; continue; }
+    if (k === 'net') { tot.net = L.mt; sec = 'end'; continue; }
+    if (L.mt === null && L.h === null && L.j === null) continue;
+    L.sec = sec; lines.push(L);
+  }
+  for (const r of rows) { const t = r.c.map(c => c.t).join(' '); if (/Paiement\s*:/i.test(t)) { const v = r.c.map(c => pnum(c.t)).filter(v => v !== null).pop(); if (v !== null && v !== undefined) tot.paiement = v; } }
+  if (tot.net === undefined && tot.paiement !== undefined) tot.net = tot.paiement;
+  if (!lines.length) throw new Error('vide');
+  return { mois, lines, comm, tot };
+}
+
+/* --- catégories et calculs --- */
+function pcat(L){
+  const map = (st.cfg && st.cfg.paieMap) || {}, k = normTxt(L.label); if (map[k]) return map[k];
+  if (L.sec && L.sec !== 'brut') return 'autre';
+  if (/mission|sejour|etranger|expat|allowance|deplacement|grand deplac/.test(k)) return 'mission';
+  if (/suppl|\bhs\b|sursalaire|majoration|heures sup|overtime/.test(k)) return 'hs';
+  if (/remuneration|salaire|appointement/.test(k)) return 'base';
+  return 'autre';
+}
+const isPrec = L => L.code === '/410' || /precompte/.test(normTxt(L.label));
+const isOnss = L => L.code === '/300' || /cotisation onss/.test(normTxt(L.label));
+function paieCalc(p){
+  const sum = f => p.lines.filter(f).reduce((s, L) => s + (L.mt || 0), 0);
+  const prec = -sum(isPrec), onss = -sum(isOnss);
+  const mis = p.lines.filter(L => L.sec === 'brut' && ['mission', 'hs'].includes(pcat(L)));
+  const misMt = mis.reduce((s, L) => s + (L.mt || 0), 0), misH = mis.filter(L => pcat(L) === 'hs').reduce((s, L) => s + (L.h || 0), 0);
+  const hsCom = p.comm.filter(L => /\bhs\b|suppl/.test(normTxt(L.label)) && !/non pay/.test(normTxt(L.label))).reduce((s, L) => s + (L.h || 0), 0);
+  const b = p.tot.brut || 0, imp = p.tot.imposable || 0, net = p.tot.net || 0;
+  return { prec, onss, mis, misMt, misH, hsCom, brut: b, imp, net, tx: imp ? prec / imp : NaN, txOnss: b ? onss / b : NaN };
+}
+function paieRef(p){            // fiches de comparaison : sans ligne mission / HS
+  const ref = st.paies.filter(q => q.id !== p.id && paieCalc(q).misMt === 0 && q.tot.brut);
+  if (!ref.length) return null; const C = ref.map(paieCalc), avg = k => C.reduce((s, c) => s + c[k], 0) / C.length;
+  return { n: ref.length, brut: avg('brut'), imp: avg('imp'), prec: avg('prec'), net: avg('net') };
+}
+function misList(){
+  const out = [];
+  for (const [id, d] of Store.missions) { if (!d || !d.sum || !d.sum.depart) continue; const x = d.sum, ret = x.retour || x.depart;
+    const months = {}; let n = 0; for (let t = new Date(x.depart + 'T12:00'); t <= new Date(ret + 'T12:00'); t.setDate(t.getDate() + 1)) { const k = t.toISOString().slice(0, 7); months[k] = (months[k] || 0) + 1; n++; }
+    out.push({ id, d, name: (d.mission && d.mission.nom) || x.ville || x.pays || 'Mission', depart: x.depart, retour: ret, months, n: n || 1, exp: x.brut || 0, hsExp: x.hs || 0 }); }
+  return out.sort((a, b) => b.depart.localeCompare(a.depart));
+}
+function gapCalc(){
+  const M = misList(), paid = {}, paidH = {}, expM = {};
+  for (const p of st.paies) for (const L of paieCalc(p).mis) { const k = L.per || p.mois; paid[k] = (paid[k] || 0) + (L.mt || 0); if (pcat(L) === 'hs') paidH[k] = (paidH[k] || 0) + (L.h || 0); }
+  { const com = {}; for (const p of st.paies) for (const L of p.comm) { const k = normTxt(L.label); if (L.h && L.per && /\bhs\b|suppl/.test(k) && !/non pay/.test(k)) com[k + '|' + L.per] = Math.max(com[k + '|' + L.per] || 0, L.h); }
+    for (const [kk, h] of Object.entries(com)) { const k = kk.split('|')[1]; paidH[k] = (paidH[k] || 0) + h; if (paid[k] === undefined) paid[k] = 0; } }
+  for (const m of M) for (const [k, n] of Object.entries(m.months)) expM[k] = (expM[k] || 0) + m.exp * n / m.n;
+  const hsM = {}; for (const m of M) for (const [k, n] of Object.entries(m.months)) hsM[k] = (hsM[k] || 0) + m.hsExp * n / m.n;
+  for (const m of M) { m.paid = 0; m.paidH = 0; m.seen = false;
+    for (const [k, n] of Object.entries(m.months)) { if (paid[k] !== undefined) m.seen = true;
+      const share = expM[k] ? m.exp * n / m.n / expM[k] : 1 / M.filter(o => o.months[k]).length; m.paid += (paid[k] || 0) * share;
+      const hshare = hsM[k] ? m.hsExp * n / m.n / hsM[k] : share; m.paidH += (paidH[k] || 0) * hshare; }
+    m.gap = m.paid - m.exp;
+    const age = (Date.now() - new Date(m.retour + 'T12:00')) / 864e5;
+    m.st = !m.seen ? (age < 75 ? ['wa', 'En attente'] : ['ko', 'Non trouvé sur les fiches']) : Math.abs(m.gap) <= Math.max(5, m.exp * 0.02) ? ['ok', 'OK'] : m.gap < 0 ? ['ko', 'Payé en moins'] : ['wa', 'Payé en plus'];
+    if (m.st[0] === 'ok' && m.hsExp && Math.abs(m.paidH - m.hsExp) > 0.25) m.st = ['wa', `€ OK · ${h2(m.hsExp - m.paidH)} h sup non retrouvées`]; }
+  const orph = Object.keys(paid).filter(k => !M.some(m => m.months[k]) && Math.abs(paid[k]) > 0.005).sort().reverse().map(k => ({ k, mt: paid[k] }));
+  return { M, orph };
+}
+const misOfMonth = k => misList().filter(m => m.months[k]);
+
+/* --- import --- */
+async function paieImport(files){
+  const msg = []; let ok = 0;
+  for (const f of files) {
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') { msg.push(`${esc(f.name)} : pas un PDF.`); continue; }
+    try { const P = parsePaie(await pdfTextItems(await f.arrayBuffer()));
+      const id = 'p' + P.mois.replace('-', ''), now = new Date().toISOString(), cur = st.paies.find(p => p.id === id);
+      const rec = { id, mois: P.mois, lines: P.lines, comm: P.comm, tot: P.tot, fichier: f.name, created: cur ? cur.created : now, updated: now };
+      if (cur) Object.assign(cur, rec); else st.paies.push(rec); ok++;
+    } catch(e) { msg.push(`${esc(f.name)} : ${e.message === 'format' || e.message === 'vide' ? 'fiche non reconnue (PDF scanné ou autre modèle ?)' : 'lecture impossible'}.`); }
+  }
+  if (ok) Store.saveProfil();
+  $('#paieMsg').innerHTML = msg.map(m => `<div class="warn">${m}</div>`).join('');
+  if (ok) saveState(`${ok} fiche${ok > 1 ? 's' : ''} importée${ok > 1 ? 's' : ''}`);
+  renderPAIE();
+}
+$('#paieImpBtn').addEventListener('click', () => $('#paieFile').click());
+$('#paieFile').addEventListener('change', e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) paieImport(f); });
+{ const z = $('#paieDrop');
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('over'); });
+  z.addEventListener('dragleave', () => z.classList.remove('over'));
+  z.addEventListener('drop', e => { e.preventDefault(); z.classList.remove('over'); const f = [...(e.dataTransfer.files || [])]; if (f.length) paieImport(f); }); }
+
+/* --- vues --- */
+const sgn = (x, cls = true) => `<span class="${cls ? (x < -0.005 ? 'pneg' : x > 0.005 ? 'ppos' : '') : ''}">${x > 0.005 ? '+' : ''}${eur(x)}</span>`;
+function renderPAIE(){
+  const yrs = [...new Set(st.paies.map(p => p.mois.slice(0, 4)))].sort().reverse();
+  if (!paieYear || (paieYear !== 'all' && !yrs.includes(paieYear))) paieYear = yrs[0] || 'all';
+  $('#paieYear').innerHTML = `<option value="all">Toutes les années</option>` + yrs.map(y => `<option ${y === paieYear ? 'selected' : ''}>${y}</option>`).join('');
+  $('#paieYear').value = paieYear;
+  const L = st.paies.filter(p => paieYear === 'all' || p.mois.startsWith(paieYear)).sort((a, b) => b.mois.localeCompare(a.mois));
+  $('#paieCount').textContent = st.paies.length ? `${L.length} fiche${L.length > 1 ? 's' : ''}` : '';
+  $('#paieBody').innerHTML = L.map(p => { const c = paieCalc(p), pers = [...new Set(c.mis.map(x => x.per || p.mois))].sort();
+    const who = pers.map(k => { const ms = misOfMonth(k); return ms.length ? ms.map(m => esc(m.name)).join(', ') + ` <small class="note">(${moisLbl(k)})</small>` : `<small class="note">${moisLbl(k)} — aucune mission encodée</small>`; }).join('<br>');
+    return `<tr data-pid="${esc(p.id)}"><td><b>${moisCap(p.mois)}</b></td><td class="num">${eur(c.brut)}</td><td class="num">${eur(c.imp)}</td><td class="num">${eur(c.prec)}<span class="sub">${pct(c.tx)}</span></td><td class="num"><b>${eur(c.net)}</b></td><td class="num">${c.misMt ? eur(c.misMt) : '—'}</td><td>${who || '<span class="note">—</span>'}</td></tr>`; }).join('')
+    || `<tr><td colspan="7" class="note" style="padding:16px">Aucune fiche pour l’instant : importe un PDF ci-dessus.</td></tr>`;
+  const G = gapCalc(), M = G.M.filter(m => paieYear === 'all' || m.depart.startsWith(paieYear) || m.retour.startsWith(paieYear));
+  const nko = M.filter(m => m.st[0] !== 'ok').length; $('#paieGapN').textContent = M.length ? (nko ? `${nko} à vérifier` : 'tout est OK') : '';
+  $('#paieGap').innerHTML = M.map(m => `<tr><td><b>${esc(m.name)}</b><span class="sub">${dFr(m.depart)} → ${dFr(m.retour)}</span></td><td class="num">${h2(m.hsExp)} h</td><td class="num">${m.seen ? h2(m.paidH) + ' h' : '—'}</td><td class="num">${eur(m.exp)}</td><td class="num">${m.seen ? eur(m.paid) : '—'}</td><td class="num">${m.seen ? sgn(m.gap) : '—'}</td><td><span class="pst ${m.st[0]}">${m.st[1]}</span></td></tr>`).join('')
+    || `<tr><td colspan="7" class="note" style="padding:16px">Aucune mission encodée dans Heures Mission${paieYear !== 'all' ? ' pour ' + paieYear : ''}.</td></tr>`;
+  $('#paieOrph').innerHTML = G.orph.length ? `<div class="warn"><b>Lignes mission / HS sans mission encodée :</b> ${G.orph.map(o => `${moisLbl(o.k)} (${eur(o.mt)})`).join(', ')}. Encode la mission dans Heures Mission, ou change la catégorie de la ligne si ce n’est pas une mission.</div>` : '';
+  $('#paieOrph').hidden = !G.orph.length;
+}
+$('#paieYear').addEventListener('change', e => { paieYear = e.target.value; renderPAIE(); });
+$('#paieBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-pid]'); if (!tr) return; paieId = tr.dataset.pid; go('paied'); });
+
+function renderPAIED(){
+  const p = st.paies.find(x => x.id === paieId); if (!p) { go('paie'); return; }
+  const c = paieCalc(p), R = paieRef(p);
+  $('#pdTitle').textContent = 'Fiche de paie — ' + moisLbl(p.mois);
+  $('#pdKpi').innerHTML = [['Brut ONSS', eur(c.brut)], ['Imposable', eur(c.imp)], [`Précompte (${pct(c.tx)})`, eur(c.prec)], ['Net payé', eur(c.net)]].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  const per = {}; for (const L of c.mis) (per[L.per || p.mois] = per[L.per || p.mois] || []).push(L);
+  $('#pdMis').innerHTML = Object.keys(per).sort().map(k => { const ms = misOfMonth(k), tot = per[k].reduce((s, L) => s + (L.mt || 0), 0);
+    return `<div class="pmis"><h4>${moisCap(k)}${k !== p.mois ? ' <small class="note">(rattrapage)</small>' : ''} : ${ms.length ? ms.map(m => `mission « ${esc(m.name)} » <small class="note">${dFr(m.depart)} → ${dFr(m.retour)}</small>`).join(', ') : '<span class="pneg">aucune mission encodée ce mois-là</span>'}</h4>
+      <ul>${per[k].map(L => `<li>${esc(L.label)}${L.h ? ` — ${h2(L.h)} h` : ''}${L.j ? ` — ${h2(L.j)} j` : ''} : <b>${eur(L.mt || 0)}</b> <small class="note">(${PCATS[pcat(L)]})</small></li>`).join('')}</ul>
+      <div class="note" style="margin-top:4px">Total : <b>${eur(tot)}</b>${ms.length === 1 ? ` · attendu pour la mission : ${eur(ms[0].exp)}` : ''}</div></div>`; }).join('')
+    || `<p class="note" style="margin:0">Aucune ligne « Mission » ou « Heures sup. » sur cette fiche. Si une ligne en est une, change sa catégorie plus bas.</p>`;
+  if (c.hsCom) $('#pdMis').innerHTML += `<p class="note" style="margin:6px 0 0">Communication de la fiche : ${p.comm.filter(L => /\bhs\b|suppl/.test(normTxt(L.label)) && L.h).map(L => `${esc(L.label)} ${moisLbl(L.per)} : ${h2(L.h)} h`).join(' · ')}.</p>`;
+  const yr = p.mois.slice(0, 4), hsY = misList().filter(m => m.depart.startsWith(yr)).reduce((s, m) => s + m.hsExp, 0), appNet = hsY > 130 ? 0.45 : 0.66;
+  const rows = [['Taux de précompte du mois <small>précompte / imposable</small>', pct(c.tx)], ['Cotisation ONSS <small>/ brut</small>', pct(c.txOnss)], ['Net / brut', pct(c.brut ? c.net / c.brut : NaN)]];
+  if (R) { rows.push([`Fiche de référence <small>moyenne de ${R.n} fiche${R.n > 1 ? 's' : ''} sans mission</small>`, `${eur(R.brut)} brut · ${eur(R.net)} net`], ['Taux de précompte de référence', pct(R.imp ? R.prec / R.imp : NaN)]);
+    const dB = c.brut - R.brut, dI = c.imp - R.imp, dP = c.prec - R.prec, dN = c.net - R.net;
+    if (c.misMt && dB > 20) rows.push(['Brut en plus vs référence', sgn(dB, false)], ['Impôt sur ce supplément <small>Δ précompte / Δ imposable</small>', `<span class="mark">${pct(dI > 0 ? dP / dI : NaN)}</span>`],
+      ['Net gardé sur ce supplément <small>Δ net / Δ brut</small>', `<span class="mark">${pct(dN / dB)}</span>`], [`Hypothèse de l’app <small>HS ${yr} : ${h2(hsY)} h ${hsY > 130 ? '&gt;' : '≤'} 130 h</small>`, pct(appNet)],
+      ['Écart réel − hypothèse', sgn((dN / dB - appNet) * dB, true) + ` <small class="note">(${pct(dN / dB - appNet)})</small>`]); }
+    $('#pdTax').innerHTML = `<dl>${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>` + (R ? '' : '<p class="note" style="margin:10px 0 0">Importe aussi une fiche d’un mois sans mission : l’app calculera alors l’impôt réellement prélevé sur la part mission / HS et l’écart avec l’hypothèse de l’app (66 % ou 45 % de net).</p>');
+  $('#pdLines').innerHTML = p.lines.map((L, i) => { const k = pcat(L), ed = L.sec === 'brut';
+    return `<tr><td class="note">${esc(L.code)}</td><td>${esc(L.label)}</td><td>${L.per ? moisLbl(L.per) : ''}</td><td class="num">${L.h != null ? h2(L.h) : ''}</td><td class="num">${L.j != null ? h2(L.j) : ''}</td><td class="num">${L.mt != null ? eur(L.mt) : ''}</td><td>${ed ? `<button type="button" class="pcat" data-c="${k}" data-li="${i}" title="Changer la catégorie">${PCATS[k]}</button>` : `<span class="note">${isPrec(L) ? 'Précompte' : isOnss(L) ? 'ONSS' : 'Retenue / autre'}</span>`}</td></tr>`; }).join('');
+}
+$('#pdLines').addEventListener('click', e => { const b = e.target.closest('[data-li]'); if (!b) return; const p = st.paies.find(x => x.id === paieId); const L = p && p.lines[+b.dataset.li]; if (!L) return;
+  const nx = PCYCLE[(PCYCLE.indexOf(pcat(L)) + 1) % PCYCLE.length]; st.cfg = st.cfg || {}; st.cfg.paieMap = { ...(st.cfg.paieMap || {}), [normTxt(L.label)]: nx };
+  Store.saveProfil(); renderPAIED(); saveState(`« ${L.label} » → ${PCATS[nx]} (toutes les fiches)`); });
+$('#pdBack').addEventListener('click', () => go('paie'));
+$('#pdDel').addEventListener('click', () => { const i = st.paies.findIndex(x => x.id === paieId); if (i < 0) return; const old = st.paies[i];
+  st.paies.splice(i, 1); Store.saveProfil(); go('paie'); undoToast(`Fiche ${moisLbl(old.mois)} supprimée`, () => { st.paies.push(old); Store.saveProfil(); renderPAIE(); }); });
+
 /* ===================== Outil 7 : Export ===================== */
 let expMission = 'all';
 const safeName = s => String(s || '').replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '') || 'sans_nom';
@@ -3143,7 +3404,7 @@ function exportItems(){
     out.push({ g: 'Carnet de tir', id: 't:x', label: 'Carnet de tir (Excel)', sub, run: wrap(expTirX) }, { g: 'Carnet de tir', id: 't:p', label: 'Carnet de tir (PDF)', sub, run: wrap(expTirP) }); }
   const ns = st.notes.filter(n => inExp(n.mission) && inDates(n.date));
   if (ns.length) out.push({ g: 'Notes', id: 'n:all', label: `Notes (texte) – ${ns.length} note${ns.length > 1 ? 's' : ''}`, sub: perLbl(), run: async () => saveFile(`Notes_${expMission === 'all' ? 'toutes' : safeName(ns[0].mission || 'sans_mission')}.txt`, new Blob(['﻿' + notesText(ns)], { type: 'text/plain' })) });
-  if (expMission === 'all' && !expFrom && !expTo) out.push({ g: 'Sauvegarde', id: 'b:json', label: 'Sauvegarde complète de toutes les données (.json)', run: async () => saveFile(`Heures_Mission_sauvegarde_${todayIso()}.json`, new Blob([JSON.stringify({ app: 'mission-v9', version: 1, exported: new Date().toISOString(), profil: { perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs }, missions: Object.fromEntries(Store.missions) }, null, 2)], { type: 'application/json' })) });
+  if (expMission === 'all' && !expFrom && !expTo) out.push({ g: 'Sauvegarde', id: 'b:json', label: 'Sauvegarde complète de toutes les données (.json)', run: async () => saveFile(`Heures_Mission_sauvegarde_${todayIso()}.json`, new Blob([JSON.stringify({ app: 'mission-v9', version: 1, exported: new Date().toISOString(), profil: { perso: st.perso, sign: st.sign, cfg: st.cfg, lists: st.lists, mads: st.mads, notes: st.notes, tirs: st.tirs, paies: st.paies }, missions: Object.fromEntries(Store.missions) }, null, 2)], { type: 'application/json' })) });
   return out;
 }
 const expSel = new Set(); let expType = 'all', expTab = 'exp';
@@ -3242,12 +3503,13 @@ function renderApps(){
   $('#appHeuresStat').textContent = n ? `${yr} : ${n} mission${n>1?'s':''} · ${j} j` : '';
   const t = todayIso(); const next = st.lists.filter(l => !l.retour || l.retour >= t).sort((x,y) => (x.depart || '9').localeCompare(y.depart || '9'))[0];
   { const yr = String(new Date().getFullYear()), n = st.tirs.filter(t => (t.date || '').startsWith(yr)).reduce((s, t) => s + cps(t), 0); $('#appTirStat').textContent = st.tirs.length ? `${yr} : ${n.toLocaleString('fr-BE')} coups` : ''; }
+  { const n = (st.paies || []).length; $('#appPaieStat').textContent = n ? `${n} fiche${n > 1 ? 's' : ''}` : ''; }
   $('#appNoteStat').textContent = st.notes.length ? `${st.notes.length} note${st.notes.length>1?'s':''}` : '';
   { const n = allNamed().size; $('#appSumStat').textContent = n ? `${n} mission${n>1?'s':''} nommée${n>1?'s':''}` : ''; }
   { const ms = [...st.mads].sort((a,b) => (b.updated||'').localeCompare(a.updated||''))[0]; $('#appMadStat').textContent = ms ? `${ms.title} : ${madTotals(ms).by.ok} / ${ms.rows.length} OK` : ''; }
   $('#appClStat').textContent = next ? `${next.title} : ${clItems(next).filter(i=>i.done).length} / ${clItems(next).length}` : '';
 }
-$('#appsGrid').addEventListener('click', e => { const b = e.target.closest('[data-app]'); if (!b) return; if (b.dataset.app === 'heures') go('h'); if (b.dataset.app === 'cl') go('cl'); if (b.dataset.app === 'mad') go('mad'); if (b.dataset.app === 'sum') go('sum'); if (b.dataset.app === 'notes') go('notes'); if (b.dataset.app === 'tir') go('tir'); if (b.dataset.app === 'exp') go('exp'); if (['tbc','tbq','tbt'].includes(b.dataset.app)) go(b.dataset.app); });
+$('#appsGrid').addEventListener('click', e => { const b = e.target.closest('[data-app]'); if (!b) return; if (b.dataset.app === 'heures') go('h'); if (b.dataset.app === 'cl') go('cl'); if (b.dataset.app === 'mad') go('mad'); if (b.dataset.app === 'sum') go('sum'); if (b.dataset.app === 'notes') go('notes'); if (b.dataset.app === 'tir') go('tir'); if (b.dataset.app === 'paie') go('paie'); if (b.dataset.app === 'exp') go('exp'); if (['tbc','tbq','tbt'].includes(b.dataset.app)) go(b.dataset.app); });
 $('#appsBtn').addEventListener('click', () => { flushNow(); go('apps'); });
 $('#finishBtn').addEventListener('click', () => { flushNow(); $('#homeBtn').click(); });
 { const l = document.createElement('link'); l.rel = 'icon'; l.href = $('#brandLogo').src; document.head.appendChild(l); }
@@ -3297,7 +3559,7 @@ $('#restoreFile').addEventListener('change', async e => { const f = e.target.fil
     const B = JSON.parse(txt); if (!B || B.app !== 'mission-v9' || !B.profil) throw new Error('format');
     const P = B.profil, newer = (x, y) => (x.updated || x.created || '') > (y.updated || y.created || '');
     let n = 0; const merge = (k) => { const cur = st[k] || (st[k] = []); for (const it of (P[k] || [])) { const i = cur.findIndex(x => x.id === it.id); if (i < 0) { cur.push(it); n++; } else if (newer(it, cur[i])) { cur[i] = it; n++; } } };
-    ['lists', 'mads', 'notes', 'tirs'].forEach(merge);
+    ['lists', 'mads', 'notes', 'tirs', 'paies'].forEach(merge);
     if (P.cfg && (!st.cfg.items || !st.cfg.items.length || confirmCfg)) st.cfg = P.cfg;
     if (P.perso && !((st.perso || {}).nom || (st.perso || {}).prenom)) st.perso = P.perso; else if (P.perso && P.perso.carnet && !(st.perso.carnet && st.perso.carnet.formations && st.perso.carnet.formations.some(x => x.date))) st.perso.carnet = P.perso.carnet;
     if (P.sign && !st.sign) st.sign = P.sign;
