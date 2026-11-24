@@ -2158,7 +2158,7 @@ function defaultCfg(){
     contexts: [
       {id:'c-risk', label:'Pays à risque'}, {id:'c-visa', label:'Visa nécessaire'}, {id:'c-mat', label:'Matériel à transporter'},
       {id:'c-hot', label:'Climat chaud'}, {id:'c-cold', label:'Climat froid'}, {id:'c-health', label:'Vaccins / santé spécifique'}],
-    cats: ['Documents', 'Santé', 'Équipement personnel', 'Technique', 'Administratif', 'Retour'],
+    cats: ['Documents', 'Santé', 'Équipement personnel', 'Technique', 'Administratif', 'Export control', 'Retour'],
     items: [
       it('Documents','Passeport valide au moins 6 mois après le retour'), it('Documents','Ordre de mission signé'),
       it('Documents','Billets d’avion et réservations (hôtel, voiture)'), it('Documents','Carte d’assistance / assurance voyage'),
@@ -2186,6 +2186,7 @@ function defaultCfg(){
 if (!st.cfg || !st.cfg.items) st.cfg = defaultCfg();
 function cfgGroups(){ const c = st.cfg; if (!Array.isArray(c.groups)) c.groups = [{ k: 'natures', label: 'Type de mission' }, { k: 'products', label: 'Produits' }, { k: 'contexts', label: 'Contexte' }];
   if (!c.destInit) { if (!c.groups.some(g => g.k === 'dests')) c.groups.push({ k: 'dests', label: 'Destination (pays)' }); c.destInit = true; }
+  if (!c.ecInit) { if (!c.cats.includes('Export control')) { const r = c.cats.indexOf('Retour'); c.cats.splice(r < 0 ? c.cats.length : r, 0, 'Export control'); } c.ecInit = true; }
   for (const g of c.groups) if (!Array.isArray(c[g.k])) c[g.k] = []; return c.groups; }
 const destTags = l => (st.cfg.dests || []).filter(t => l.sel.includes(t.id)).map(t => t.label);
 const cfgTags = () => cfgGroups().flatMap(g => st.cfg[g.k].map(t => ({ ...t, g: g.label, gk: g.k })));
@@ -2271,7 +2272,7 @@ $('#clmCrit').addEventListener('click', e => {
   if (hit('[data-tpldel]')) { const id = hit('[data-tpldel]').dataset.tpldel, i = st.cfg.templates.findIndex(x => x.id === id), old = st.cfg.templates[i]; st.cfg.templates.splice(i, 1); if (cle && cle.draft.tpl === id) cle.draft.tpl = null; saveCfgSoon(); renderCLE(); undoToast('Modèle supprimé', () => { st.cfg.templates.splice(i, 0, old); saveCfgSoon(); renderCLE(); }); return; }
   if (hit('[data-titems]')) { const id = hit('[data-titems]').dataset.titems; cleTagOpen = cleTagOpen === id ? null : id; renderCLE(); return; }
   if (hit('[data-tclose]')) { cleTagOpen = null; renderCLE(); return; }
-  if (hit('[data-iadd]')) { const tid = hit('[data-iadd]').dataset.iadd; st.cfg.items.push({ id: 'i' + Date.now().toString(36), cat: st.cfg.cats[0] || 'Divers', text: '', tags: [tid] }); if (!st.cfg.cats.length) st.cfg.cats.push('Divers'); saveCfgSoon(); renderCLE(); const ins = $$('#clmCrit .tipanel [data-itext]'); if (ins.length) ins[ins.length - 1].focus(); return; }
+  if (hit('[data-iadd]')) { const tid = hit('[data-iadd]').dataset.iadd; st.cfg.items.push({ id: 'i' + Date.now().toString(36), cat: (st.cfg.dests || []).some(t => t.id === tid) && st.cfg.cats.includes('Export control') ? 'Export control' : (st.cfg.cats[0] || 'Divers'), text: '', tags: [tid] }); if (!st.cfg.cats.length) st.cfg.cats.push('Divers'); saveCfgSoon(); renderCLE(); const ins = $$('#clmCrit .tipanel [data-itext]'); if (ins.length) ins[ins.length - 1].focus(); return; }
   if (hit('[data-iunl]')) { const row = hit('[data-iunl]').closest('[data-iid]'), it = st.cfg.items.find(x => x.id === row.dataset.iid), tid = row.closest('[data-tpanel]').dataset.tpanel;
     if (it) { if (it.tags.length > 1) it.tags = it.tags.filter(x => x !== tid); else st.cfg.items = st.cfg.items.filter(x => x !== it); saveCfgSoon(); } renderCLE(); return; }
   if (hit('#clmGAdd')) { const g = { k: 'g' + Date.now().toString(36), label: 'Nouveau sujet' }; st.cfg.groups.push(g); st.cfg[g.k] = []; saveCfgSoon(); renderCLE(); const ins = $$('#clmCrit [data-gren]'); const l = ins[ins.length - 1]; if (l) { l.focus(); l.select(); } return; }
