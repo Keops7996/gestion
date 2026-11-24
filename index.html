@@ -686,6 +686,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
         <thead><tr><th>Mois</th><th>Position</th><th class="num">Barème</th><th class="num">Rémunération</th><th class="num">Plan flex</th><th class="num">Avant flex</th><th class="num">Dérive</th><th class="num">%</th></tr></thead>
         <tbody id="grBody"></tbody></table></div>
       <div class="body" id="grSum"></div>
+      <div class="body" id="grHist" style="padding-top:0"></div>
     </section>
     <section class="card">
       <h2>Écarts missions encodées ↔ fiches de paie <span class="tag" id="paieGapN"></span></h2>
@@ -3392,6 +3393,21 @@ $('#grImpBtn').addEventListener('click', () => $('#grFile').click());
 $('#grFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) grilleImport(f); });
 $('#grList').addEventListener('click', e => { const b = e.target.closest('[data-grdel]'); if (!b) return; const old = st.cfg.grilles.find(x => x.date === b.dataset.grdel);
   st.cfg.grilles = st.cfg.grilles.filter(x => x !== old); Store.saveProfil(); renderPAIE(); undoToast(`Barème du ${dFr(old.date)} supprimé`, () => { st.cfg.grilles.push(old); Store.saveProfil(); renderPAIE(); }); });
+function catHist(){
+  const P = st.paies.filter(p => p.info && p.info.statut).sort((a, b) => a.mois.localeCompare(b.mois)), out = [];
+  for (const p of P) { const c = p.info.statut, cur = out[out.length - 1]; if (cur && cur.cat === c) cur.last = p.mois; else out.push({ cat: c, from: p.mois, last: p.mois }); }
+  const mIdx = ym => { const [y, m] = ym.split('-').map(Number); return y * 12 + m - 1; }, now = new Date(), nowI = now.getFullYear() * 12 + now.getMonth();
+  out.forEach((h, i) => { const pv = out[i - 1]; h.gap = pv && mIdx(h.from) - mIdx(pv.last) > 1 ? (() => { const k = mIdx(pv.last) + 1; return `${k / 12 | 0}-${String(k % 12 + 1).padStart(2, '0')}`; })() : null; const nx = out[i + 1]; h.to = nx ? nx.from : null; h.mois = (nx ? mIdx(nx.from) : nowI + 1) - mIdx(h.from); h.first = i === 0; });
+  return out;
+}
+function renderCatHist(){
+  const H = catHist(), el = $('#grHist'); if (!H.length) { el.innerHTML = ''; return; }
+  const yrs = n => (n / 12).toLocaleString('fr-BE', { maximumFractionDigits: 1 }) + ' an' + (n >= 24 ? 's' : '') + ` <small class="note">(${n} mois)</small>`;
+  el.innerHTML = `<h3 class="lbl" style="margin:0 0 8px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;font-size:12px">Historique des catégories</h3>
+    <div class="tablebox"><table class="hist paiet"><thead><tr><th>Catégorie</th><th>Passage</th><th>Jusqu’à</th><th class="num">Durée</th></tr></thead><tbody>
+    ${H.slice().reverse().map(h => `<tr><td><b>${esc(h.cat)}</b>${h.to ? '' : ' <small class="note">(actuelle)</small>'}</td><td>${h.first ? `≤ ${moisLbl(h.from)} <small class="note">(1re fiche importée)</small>` : h.gap ? `${moisCap(h.from)} <small class="note">(au plus tôt ${moisLbl(h.gap)}, fiches manquantes)</small>` : moisCap(h.from)}</td><td>${h.to ? moisLbl(h.to) : 'aujourd’hui'}</td><td class="num">${h.first ? '≥ ' : ''}${yrs(h.mois)}</td></tr>`).join('')}</tbody></table></div>
+    <p class="note" style="margin:8px 0 0">Calculé à partir des fiches importées : importe tes anciennes fiches pour remonter plus loin.</p>`;
+}
 function renderGrille(L){
   const G = grilles(), lastP = [...st.paies].sort((a, b) => b.mois.localeCompare(a.mois))[0];
   $('#grList').innerHTML = G.length ? G.slice().reverse().map(g => `<span class="grchip">Barème du ${dFr(g.date)} <small class="note">${Object.keys(g.reg).sort((a, b) => b - a).map(r => REGS[r] || r + ' %').join(' · ')}</small><button type="button" class="x" data-grdel="${esc(g.date)}" aria-label="Supprimer">✕</button></span>`).join('') : '<span class="note">Aucun barème chargé.</span>';
@@ -3405,6 +3421,7 @@ function renderGrille(L){
   const ok = rows.filter(r => !r.b.err); let s = '';
   if (ok.length) { const ko = ok.filter(r => Math.abs(r.b.d) > 1); const sous = ko.filter(r => r.b.d < 0).length, sur = ko.length - sous; s = ko.length ? `<div class="warn"><b>${[sous && `${sous} mois sous le barème`, sur && `${sur} mois au-dessus`].filter(Boolean).join(', ')}.</b> Dérive moyenne : ${eur(ko.reduce((t, r) => t + r.b.d, 0) / ko.length)} / mois, cumul ${eur(ko.reduce((t, r) => t + r.b.d, 0))}.</div>` : `<div class="note">Toutes les fiches correspondent au barème (± 1 €).</div>`; }
   $('#grSum').innerHTML = s;
+  renderCatHist();
 }
 
 /* --- brut du profil = salaire de la dernière fiche (avant plan flex) --- */
