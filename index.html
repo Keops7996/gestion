@@ -676,7 +676,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
     <section class="card">
       <h2>Barème salarial <span class="tag">plan flex inclus</span></h2>
       <div class="body">
-        <div class="paiedrop" style="margin-bottom:10px"><div><b>Barème (PDF)</b><div class="note">Charge le nouveau barème à chaque indexation : chaque fiche est comparée au barème en vigueur ce mois-là.</div><div id="grList" class="grlist"></div></div>
+        <div class="paiedrop" style="margin-bottom:10px"><div><b>Barème (PDF)</b><div class="note">Charge le nouveau barème à chaque indexation : chaque fiche est comparée au barème en vigueur à sa date (date d’application de l’index). Pour les fiches plus anciennes, charge aussi les barèmes précédents.</div><div id="grList" class="grlist"></div></div>
           <button type="button" class="btn" id="grImpBtn">Charger un barème…</button><input type="file" id="grFile" accept="application/pdf,.pdf" hidden></div>
         <div id="grMsg" class="warns"></div>
         <div class="note" id="grPos" style="margin-top:4px"></div>
@@ -3345,9 +3345,10 @@ const grilles = () => ((st.cfg && st.cfg.grilles) || []).slice().sort((a, b) => 
 function parseGrille(items){
   const rows = []; for (const it of [...items].sort((a, b) => b.y - a.y || a.x - b.x)) { const r = rows.find(r => Math.abs(r.y - it.y) < 3); if (r) r.c.push(it); else rows.push({ y: it.y, c: [it] }); }
   rows.forEach(r => r.c.sort((a, b) => a.x - b.x));
-  let date = '', reg = 100, cls = null; const out = {};
+  let date = '', reg = 100, cls = null, idx = null; const out = {};
   for (const r of rows) { const toks = r.c.map(c => c.t.trim()).filter(Boolean), t = toks.join(' '), n = normTxt(t);
     const dm = n.match(/(\d{1,2})(?:er)?\s+(janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\s+(\d{4})/);
+    { const im = t.match(/([+-]?\s*\d+[.,]\d+)\s*%\s*index/i); if (im && idx === null) idx = pnum(im[1].replace(/\s/g, '').replace('+', '')); }
     if (dm && !date) date = `${dm[3]}-${String(MOIS_FR.map(normTxt).indexOf(dm[2]) + 1).padStart(2, '0')}-${dm[1].padStart(2, '0')}`;
     if (/bareme/.test(n)) { reg = /4\s*\/\s*5/.test(n) ? 80 : /9\s*\/\s*10/.test(n) ? 90 : /mi.?temps|1\s*\/\s*2/.test(n) ? 50 : 100; cls = null; continue; }
     const codes = toks.filter(x => /^\d{3}$/.test(x)); if (codes.length >= 3 && codes.length >= toks.length - 2 && !toks.some(x => /,/.test(x))) { cls = codes; continue; }
@@ -3357,12 +3358,12 @@ function parseGrille(items){
     if (age < 14 || age > 75 || vals.length !== cls.length) continue;
     const R = out[reg] || (out[reg] = { cls: cls.slice(), ages: {} }); R.ages[age] = vals; }
   if (!Object.keys(out).length) throw new Error('format');
-  return { date: date || todayIso(), reg: out };
+  return { date: date || todayIso(), idx, reg: out };
 }
-function grilleFor(mois){ const G = grilles(), d = (mois || '9999-12') + '-31'; let g = null; for (const x of G) if (x.date <= d) g = x; return g || G[0] || null; }
+function grilleFor(mois){ const G = grilles(), d = (mois || '9999-12') + '-31'; let g = null; for (const x of G) if (x.date <= d) g = x; return g; }
 function ageAt(naiss, mois){ if (!naiss || !mois) return null; const [y, m] = naiss.split('-').map(Number), [Y, M] = mois.split('-').map(Number); return Y - y - (M < m ? 1 : 0); }
 function baremeOf(p){
-  const g = grilleFor(p.mois); if (!g) return { err: 'Aucun barème chargé.' };
+  const g = grilleFor(p.mois); if (!g) return { err: grilles().length ? `Pas de barème en vigueur en ${moisLbl(p.mois)} : charge le barème indexé applicable à ce mois-là (le plus ancien chargé date du ${dFr(grilles()[0].date)}).` : 'Aucun barème chargé.' };
   const classe = (p.info && p.info.statut) || '', regime = +(st.perso.regime || 100), naiss = st.perso.naiss || '';
   if (!classe) return { err: 'Catégorie absente : réimporte cette fiche pour lire la catégorie de ton statut.' };
   if (!/^\d{4}-\d{2}/.test(naiss)) return { err: 'Indique ta date de naissance dans ton profil (page principale).' };
@@ -3410,7 +3411,7 @@ function renderCatHist(){
 }
 function renderGrille(L){
   const G = grilles(), lastP = [...st.paies].sort((a, b) => b.mois.localeCompare(a.mois))[0];
-  $('#grList').innerHTML = G.length ? G.slice().reverse().map(g => `<span class="grchip">Barème du ${dFr(g.date)} <small class="note">${Object.keys(g.reg).sort((a, b) => b - a).map(r => REGS[r] || r + ' %').join(' · ')}</small><button type="button" class="x" data-grdel="${esc(g.date)}" aria-label="Supprimer">✕</button></span>`).join('') : '<span class="note">Aucun barème chargé.</span>';
+  $('#grList').innerHTML = G.length ? G.slice().reverse().map(g => `<span class="grchip">Barème du ${dFr(g.date)}${g.idx != null ? ` <b>(+${String(g.idx).replace('.', ',')} % index)</b>` : ''} <small class="note">${Object.keys(g.reg).sort((a, b) => b - a).map(r => REGS[r] || r + ' %').join(' · ')}</small><button type="button" class="x" data-grdel="${esc(g.date)}" aria-label="Supprimer">✕</button></span>`).join('') : '<span class="note">Aucun barème chargé.</span>';
   const cat = (lastP && lastP.info && lastP.info.statut) || '';
   $('#grPos').innerHTML = `Catégorie : <b>${cat ? esc(cat) : '—'}</b> <small>(statut de la fiche)</small> · Régime : <b>${REGS[+(st.perso.regime || 100)]}</b> · Naissance : <b>${st.perso.naiss ? dFr(st.perso.naiss) : 'à indiquer'}</b> <small>(profil, page principale)</small>`;
   const rows = L.map(p => ({ p, b: baremeOf(p) }));
