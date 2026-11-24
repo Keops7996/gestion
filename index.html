@@ -1675,6 +1675,7 @@ function go(n){
   $('#appTitle').textContent = ttl; document.title = ttl;
   if (['tbc','tbq','tbt'].includes(n)) openTB(n);
   if (n === 'apps') renderApps();
+  if (n === 0) syncBrut();
   if (n === 'h') renderHome();
   { const show = tool === 'cl' && n !== 'cle', l = clId && getList(clId); $('#clNav').hidden = !show;
     if (show) { $('#clNavCur').hidden = !l; if (l) $('#clNavCur').textContent = '✓ ' + (l.title || l.mission || 'Check-list'); for (const x of $$('#clNav [data-cln]')) x.setAttribute('aria-current', x.dataset.cln === n ? 'page' : 'false'); } }
@@ -3400,9 +3401,22 @@ function renderGrille(L){
   $('#grSum').innerHTML = s;
 }
 
+/* --- brut du profil = salaire de la dernière fiche (avant plan flex) --- */
+function brutFiche(p){ const base = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'base').reduce((s, L) => s + (L.mt || 0), 0);
+  const flex = -p.comm.filter(L => /^red\.?\s*sal/.test(normTxt(L.label)) && L.mt).reduce((s, L) => s + L.mt, 0); return { base, flex, tot: Math.round((base + flex) * 100) / 100 }; }
+function syncBrut(){
+  const last = [...st.paies].filter(p => brutFiche(p).base > 0).sort((a, b) => b.mois.localeCompare(a.mois))[0], el = $('#u_brut'), lb = $('label[for=u_brut]');
+  if (last) { const b = brutFiche(last), v = b.tot.toFixed(2); el.readOnly = true;
+    lb.innerHTML = `Brut mensuel (€) <span class="hint">fiche ${moisLbl(last.mois)}${b.flex ? ', avant plan flex' : ''}</span>`;
+    if (st.perso.brut !== v || st.perso.brutSrc !== last.mois) { st.perso.brut = v; st.perso.brutSrc = last.mois; Store.saveProfil(); }
+    el.value = v; }
+  else { el.readOnly = false; lb.textContent = 'Brut mensuel (€)'; if (st.perso.brutSrc) { delete st.perso.brutSrc; Store.saveProfil(); } }
+}
+
 /* --- vues --- */
 const sgn = (x, cls = true) => `<span class="${cls ? (x < -0.005 ? 'pneg' : x > 0.005 ? 'ppos' : '') : ''}">${x > 0.005 ? '+' : ''}${eur(x)}</span>`;
 function renderPAIE(){
+  syncBrut();
   const yrs = [...new Set(st.paies.map(p => p.mois.slice(0, 4)))].sort().reverse();
   if (!paieYear || (paieYear !== 'all' && !yrs.includes(paieYear))) paieYear = yrs[0] || 'all';
   $('#paieYear').innerHTML = `<option value="all">Toutes les années</option>` + yrs.map(y => `<option ${y === paieYear ? 'selected' : ''}>${y}</option>`).join('');
@@ -3459,6 +3473,8 @@ $('#pdBack').addEventListener('click', () => go('paie'));
 $('#pdDel').addEventListener('click', () => { const i = st.paies.findIndex(x => x.id === paieId); if (i < 0) return; const old = st.paies[i];
   st.paies.splice(i, 1); Store.saveProfil(); go('paie'); undoToast(`Fiche ${moisLbl(old.mois)} supprimée`, () => { st.paies.push(old); Store.saveProfil(); renderPAIE(); }); });
 
+
+syncBrut();
 /* ===================== Outil 7 : Export ===================== */
 let expMission = 'all';
 const safeName = s => String(s || '').replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '') || 'sans_nom';
