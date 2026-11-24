@@ -676,8 +676,8 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
     <section class="card">
       <h2>Barème salarial <span class="tag">plan flex inclus</span></h2>
       <div class="body">
-        <div class="paiedrop" style="margin-bottom:10px"><div><b>Barème (PDF)</b><div class="note">Charge le nouveau barème à chaque indexation : chaque fiche est comparée au barème en vigueur à sa date (date d’application de l’index). Pour les fiches plus anciennes, charge aussi les barèmes précédents.</div><div id="grList" class="grlist"></div></div>
-          <button type="button" class="btn" id="grImpBtn">Charger un barème…</button><input type="file" id="grFile" accept="application/pdf,.pdf" hidden></div>
+        <div class="paiedrop" style="margin-bottom:10px"><div><b>Barème (PDF ou Excel SETCa)</b><div class="note">Charge le nouveau barème à chaque indexation : chaque fiche est comparée au barème en vigueur à sa date (date d’application de l’index). Pour les fiches plus anciennes, charge aussi les barèmes précédents.</div><div id="grList" class="grlist"></div></div>
+          <button type="button" class="btn" id="grImpBtn">Charger un barème…</button><input type="file" id="grFile" accept="application/pdf,.pdf,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden></div>
         <div id="grMsg" class="warns"></div>
         <div class="note" id="grPos" style="margin-top:4px"></div>
         <p class="note" style="margin:10px 0 0">Salaire avant plan flex = « Rémunération » de la fiche + réductions de salaire du plan flex (leasing voiture, GSM…) reprises dans la communication de la fiche.</p>
@@ -3383,15 +3383,41 @@ function baremeOf(p){
   const theo = base + flex;
   return { g, classe, regime, age: ageTxt, how, bar, base, flexL, flex, theo, d: theo - bar, dp: bar ? (theo - bar) / bar : NaN };
 }
+async function parseGrilleXlsx(buf){
+  const z = await JSZip.loadAsync(buf), rd = async n => { const f = z.file(n); return f ? f.async('string') : ''; };
+  const dp = new DOMParser(), X = s => dp.parseFromString(s, 'application/xml');
+  const ss = [...X(await rd('xl/sharedStrings.xml')).getElementsByTagName('si')].map(si => [...si.getElementsByTagName('t')].map(t => t.textContent).join(''));
+  const wb = X(await rd('xl/workbook.xml')), rels = X(await rd('xl/_rels/workbook.xml.rels'));
+  const relT = id => { const r = [...rels.getElementsByTagName('Relationship')].find(r => r.getAttribute('Id') === id); return r ? 'xl/' + r.getAttribute('Target').replace(/^\/?xl\//, '') : ''; };
+  const sheets = [...wb.getElementsByTagName('sheet')].map(s => ({ name: s.getAttribute('name'), path: relT(s.getAttribute('r:id') || s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id')) }));
+  sheets.sort((a, b) => (/bareme/.test(normTxt(b.name)) ? 1 : 0) - (/bareme/.test(normTxt(a.name)) ? 1 : 0));
+  let date = ''; for (const t of ss) { const dm = normTxt(t).match(/(\d{1,2})\s*(?:er)?\s+(janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\s+(\d{4})/); if (dm) { date = `${dm[3]}-${String(MOIS_FR.map(normTxt).indexOf(dm[2]) + 1).padStart(2, '0')}-${dm[1].padStart(2, '0')}`; break; } }
+  const colN = r => { const m = r.match(/^[A-Z]+/)[0]; let n = 0; for (const ch of m) n = n * 26 + ch.charCodeAt(0) - 64; return n; };
+  for (const sh of sheets) { const doc = X(await rd(sh.path)); const rows = [];
+    for (const r of doc.getElementsByTagName('row')) { const cells = {};
+      for (const c of r.getElementsByTagName('c')) { const v = c.getElementsByTagName('v')[0]; if (!v) continue; const t = c.getAttribute('t'); cells[colN(c.getAttribute('r'))] = t === 's' ? ss[+v.textContent] : t === 'str' || t === 'inlineStr' ? v.textContent : +v.textContent; }
+      rows.push(cells); }
+    let cls = null; const ages = {};
+    for (const cells of rows) {
+      const codes = Object.entries(cells).filter(([, v]) => Number.isInteger(+v) && +v >= 400 && +v < 500 && String(v).length === 3);
+      if (!cls && codes.length >= 5) { cls = codes.map(([k, v]) => [+k, String(+v)]).sort((a, b) => a[0] - b[0]); continue; }
+      if (!cls) continue;
+      const first = cls[0][0], ageE = Object.entries(cells).filter(([k, v]) => +k < first && typeof v === 'number' && Number.isInteger(v) && v >= 14 && v <= 75).pop();
+      if (!ageE) continue; const vals = cls.map(([k]) => cells[k]); if (vals.some(v => typeof v !== 'number' || v < 500)) continue;
+      ages[ageE[1]] = vals.map(v => Math.round(v * 100) / 100); }
+    if (cls && Object.keys(ages).length >= 5) return { date: date || todayIso(), idx: null, reg: { 100: { cls: cls.map(c => c[1]), ages } } };
+  }
+  throw new Error('format');
+}
 async function grilleImport(f){
-  try { const G = parseGrille(await pdfTextItems(await f.arrayBuffer()));
+  try { const buf = await f.arrayBuffer(), G = /\.xlsx$/i.test(f.name) ? await parseGrilleXlsx(buf) : parseGrille(await pdfTextItems(buf));
     st.cfg = st.cfg || {}; st.cfg.grilles = (st.cfg.grilles || []).filter(x => x.date !== G.date).concat([{ ...G, fichier: f.name }]);
     Store.saveProfil(); saveState(`Barème du ${dFr(G.date)} chargé`); $('#grMsg').innerHTML = '';
-  } catch(e) { $('#grMsg').innerHTML = `<div class="warn">${esc(f.name)} : barème non reconnu (il faut un PDF avec un tableau âge × classes).</div>`; }
+  } catch(e) { $('#grMsg').innerHTML = `<div class="warn">${esc(f.name)} : barème non reconnu (PDF SETCa ou fichier Excel « Salaire » SETCa attendu).</div>`; }
   renderPAIE();
 }
 $('#grImpBtn').addEventListener('click', () => $('#grFile').click());
-$('#grFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) grilleImport(f); });
+$('#grFile').addEventListener('change', async e => { const fs = [...e.target.files]; e.target.value = ''; for (const f of fs) await grilleImport(f); });
 $('#grList').addEventListener('click', e => { const b = e.target.closest('[data-grdel]'); if (!b) return; const old = st.cfg.grilles.find(x => x.date === b.dataset.grdel);
   st.cfg.grilles = st.cfg.grilles.filter(x => x !== old); Store.saveProfil(); renderPAIE(); undoToast(`Barème du ${dFr(old.date)} supprimé`, () => { st.cfg.grilles.push(old); Store.saveProfil(); renderPAIE(); }); });
 function catHist(){
