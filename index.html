@@ -679,11 +679,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
         <div class="paiedrop" style="margin-bottom:10px"><div><b>Barème (PDF)</b><div class="note">Charge le nouveau barème à chaque indexation : chaque fiche est comparée au barème en vigueur ce mois-là.</div><div id="grList" class="grlist"></div></div>
           <button type="button" class="btn" id="grImpBtn">Charger un barème…</button><input type="file" id="grFile" accept="application/pdf,.pdf" hidden></div>
         <div id="grMsg" class="warns"></div>
-        <div class="fields">
-          <div class="f"><label for="grClasse">Classe</label><select id="grClasse"></select></div>
-          <div class="f"><label for="grRegime">Régime</label><select id="grRegime"></select></div>
-          <div class="f"><label for="grNaiss">Mois de naissance <span class="hint">(pour l’âge)</span></label><input type="month" id="grNaiss"></div>
-        </div>
+        <div class="note" id="grPos" style="margin-top:4px"></div>
         <p class="note" style="margin:10px 0 0">Salaire avant plan flex = « Rémunération » de la fiche + réductions de salaire du plan flex (leasing voiture, GSM…) reprises dans la communication de la fiche.</p>
       </div>
       <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
@@ -865,6 +861,8 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
           <div class="f"><label for="u_statut">Statut</label><select id="u_statut" data-b="perso.statut"><option>Employé</option><option>Cadre</option></select></div>
           <div class="f"><label for="u_fonction">Fonction</label><input id="u_fonction" data-b="perso.fonction"></div>
           <div class="f"><label for="u_dept">Département</label><input id="u_dept" data-b="perso.dept"></div>
+          <div class="f"><label for="u_naiss">Date de naissance</label><input type="date" id="u_naiss" data-b="perso.naiss"></div>
+          <div class="f"><label for="u_regime">Régime de travail</label><select id="u_regime" data-b="perso.regime"><option value="100">Temps plein</option><option value="90">9/10e</option><option value="80">4/5e</option><option value="50">Mi-temps</option></select></div>
           <div class="f"><label for="u_brut">Brut mensuel (€)</label><input type="number" step="0.01" id="u_brut" data-b="perso.brut"></div>
           <div class="f"><span class="lbl">Responsabilité par défaut (+0,10)</span><div class="seg" data-seg="perso.resp"><button type="button" data-v="1">Oui</button><button type="button" data-v="0">Non</button></div></div>
           <div class="f"><span class="lbl">Séniorité ≥ 5 ans (+0,10)</span><div class="seg" data-seg="perso.senior"><button type="button" data-v="1">Oui</button><button type="button" data-v="0">Non</button></div></div>
@@ -1308,7 +1306,7 @@ const rd = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } 
 const wr = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} };
 
 const emptyMission = () => ({nom:'', risque:false, depart:'', retour:'', pays:'', ville:'', ar800:'OUI', client:'', nature:'', ov:'', cf:'', cfLabel:'', demande:''});
-const PROFIL_DEFAULT = { perso: {...DATA.defaults.perso, resp:true, senior:true}, sign: {resp:'', dir:'', drh:'', rcm:''} };
+const PROFIL_DEFAULT = { perso: {...DATA.defaults.perso, resp:true, senior:true, regime:'100', naiss:''}, sign: {resp:'', dir:'', drh:'', rcm:''} };
 
 // reprise des anciennes versions
 const old = rd(KEY_OLD);
@@ -3361,20 +3359,20 @@ function parseGrille(items){
 }
 function grilleFor(mois){ const G = grilles(), d = (mois || '9999-12') + '-31'; let g = null; for (const x of G) if (x.date <= d) g = x; return g || G[0] || null; }
 function ageAt(naiss, mois){ if (!naiss || !mois) return null; const [y, m] = naiss.split('-').map(Number), [Y, M] = mois.split('-').map(Number); return Y - y - (M < m ? 1 : 0); }
-const bPos = () => (st.perso.bareme = st.perso.bareme || { classe: '', regime: '', naiss: '' });
 function baremeOf(p){
-  const B = bPos(), g = grilleFor(p.mois); if (!g) return { err: 'Aucun barème chargé.' };
-  const classe = B.classe || (p.info && p.info.statut) || '', act = p.info && p.info.activite;
-  const regime = +(B.regime || (act >= 99 ? 100 : act >= 89 ? 90 : act >= 79 ? 80 : act >= 49 ? 50 : 100));
-  const age = ageAt(B.naiss, p.mois); const R = g.reg[regime] || g.reg[100];
-  if (!classe) return { err: 'Indique ta classe barème.' }; if (age === null) return { err: 'Indique ton mois de naissance.' };
+  const g = grilleFor(p.mois); if (!g) return { err: 'Aucun barème chargé.' };
+  const classe = (p.info && p.info.statut) || '', regime = +(st.perso.regime || 100), naiss = st.perso.naiss || '';
+  const age = ageAt(naiss.slice(0, 7), p.mois); const R = g.reg[regime];
+  if (!classe) return { err: 'Catégorie absente : réimporte cette fiche pour lire la catégorie de ton statut.' };
+  if (age === null) return { err: 'Indique ta date de naissance dans ton profil (page principale).' };
+  if (!R) return { err: `Le barème du ${dFr(g.date)} n’a pas de tableau ${REGS[regime] || regime + ' %'}.` };
   const ci = R.cls.indexOf(String(classe)); if (ci < 0) return { err: `Classe ${classe} absente du barème.` };
   const ages = Object.keys(R.ages).map(Number).sort((a, b) => a - b), a = Math.min(Math.max(age, ages[0]), ages[ages.length - 1]);
   const bar = R.ages[a][ci];
   const base = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'base').reduce((s, L) => s + (L.mt || 0), 0);
   const flexL = p.comm.filter(L => /^red\.?\s*sal/.test(normTxt(L.label)) && L.mt), flex = -flexL.reduce((s, L) => s + L.mt, 0);
   const theo = base + flex;
-  return { g, classe, regime, age, bar, base, flexL, flex, theo, d: theo - bar, dp: bar ? (theo - bar) / bar : NaN, bday: B.naiss && +B.naiss.split('-')[1] === +p.mois.split('-')[1] };
+  return { g, classe, regime, age, bar, base, flexL, flex, theo, d: theo - bar, dp: bar ? (theo - bar) / bar : NaN, bday: +naiss.split('-')[1] === +p.mois.split('-')[1] };
 }
 async function grilleImport(f){
   try { const G = parseGrille(await pdfTextItems(await f.arrayBuffer()));
@@ -3387,14 +3385,11 @@ $('#grImpBtn').addEventListener('click', () => $('#grFile').click());
 $('#grFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) grilleImport(f); });
 $('#grList').addEventListener('click', e => { const b = e.target.closest('[data-grdel]'); if (!b) return; const old = st.cfg.grilles.find(x => x.date === b.dataset.grdel);
   st.cfg.grilles = st.cfg.grilles.filter(x => x !== old); Store.saveProfil(); renderPAIE(); undoToast(`Barème du ${dFr(old.date)} supprimé`, () => { st.cfg.grilles.push(old); Store.saveProfil(); renderPAIE(); }); });
-['grClasse', 'grRegime', 'grNaiss'].forEach(id => $('#' + id).addEventListener('change', e => { const B = bPos(); B[{ grClasse: 'classe', grRegime: 'regime', grNaiss: 'naiss' }[id]] = e.target.value; Store.saveProfil(); renderPAIE(); }));
 function renderGrille(L){
-  const G = grilles(), B = bPos(), last = G[G.length - 1], lastP = [...st.paies].sort((a, b) => b.mois.localeCompare(a.mois))[0];
+  const G = grilles(), lastP = [...st.paies].sort((a, b) => b.mois.localeCompare(a.mois))[0];
   $('#grList').innerHTML = G.length ? G.slice().reverse().map(g => `<span class="grchip">Barème du ${dFr(g.date)} <small class="note">${Object.keys(g.reg).sort((a, b) => b - a).map(r => REGS[r] || r + ' %').join(' · ')}</small><button type="button" class="x" data-grdel="${esc(g.date)}" aria-label="Supprimer">✕</button></span>`).join('') : '<span class="note">Aucun barème chargé.</span>';
-  const cls = last ? (last.reg[100] || Object.values(last.reg)[0]).cls : [], dflt = (lastP && lastP.info && lastP.info.statut) || '';
-  $('#grClasse').innerHTML = `<option value="">${dflt ? 'Selon la fiche (' + dflt + ')' : '—'}</option>` + cls.map(c => `<option ${c === B.classe ? 'selected' : ''}>${c}</option>`).join('');
-  $('#grRegime').innerHTML = `<option value="">Selon la fiche</option>` + Object.entries(REGS).map(([k, v]) => `<option value="${k}" ${k === String(B.regime) ? 'selected' : ''}>${v}</option>`).join('');
-  $('#grNaiss').value = B.naiss || '';
+  const cat = (lastP && lastP.info && lastP.info.statut) || '';
+  $('#grPos').innerHTML = `Catégorie : <b>${cat ? esc(cat) : '—'}</b> <small>(statut de la fiche)</small> · Régime : <b>${REGS[+(st.perso.regime || 100)]}</b> · Naissance : <b>${st.perso.naiss ? dFr(st.perso.naiss) : 'à indiquer'}</b> <small>(profil, page principale)</small>`;
   const rows = L.map(p => ({ p, b: baremeOf(p) }));
   $('#grBody').innerHTML = !G.length ? `<tr><td colspan="8" class="note" style="padding:16px">Charge le barème (PDF) pour comparer tes fiches.</td></tr>`
     : rows.map(({ p, b }) => b.err ? `<tr><td><b>${moisCap(p.mois)}</b></td><td colspan="7" class="note">${esc(b.err)}</td></tr>`
