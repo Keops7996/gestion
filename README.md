@@ -24,3 +24,6 @@ connecteurs, couples de serrage, balistique et export.
 ## Mise à jour
 
 Remplacer `index.html` puis incrémenter `CACHE` dans `sw.js`.
+
+## Composants tiers
+- Lecture des PDF scannés : moteur OCR Tesseract (tesseract.js-core, licence Apache 2.0) et données `fra` de tessdata_fast (Apache 2.0), décodeur CCITT de pdf.js (Mozilla, Apache 2.0). Tout fonctionne hors ligne.
