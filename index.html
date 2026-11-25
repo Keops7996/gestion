@@ -435,6 +435,23 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 .ienum{width:84px;text-align:right}
 .hscap{font-size:13px;line-height:1.5;border-top:1px solid var(--line-2);padding-top:8px;margin-top:4px}
 .ref{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;text-transform:none;color:var(--navy);border:1px solid color-mix(in srgb,var(--navy) 35%,transparent);border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:1px}
+.paiet td{vertical-align:top}.paiet .pst{white-space:normal}
+.gapdet>td>.gaprep{width:0;min-width:100%;box-sizing:border-box}
+.gaprep dl{grid-template-columns:minmax(0,1fr) minmax(0,auto)}.gaprep dd{white-space:normal;overflow-wrap:anywhere;max-width:60ch}
+.gaprep table.hist{min-width:0}.gaprep .tablebox{overflow-x:auto}
+#pdTax dd,#pdBar dd{white-space:normal}
+#ieCard table.hist{min-width:0;font-size:13px}#ieCard table.hist th{white-space:normal}#ieCard .ienum{width:68px}
+@media (max-width:1024px){
+  table.hist.paiet{min-width:0}.hist.paiet thead{display:none}.hist.paiet tbody{display:block}
+  .hist.paiet tr{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px 12px;padding:12px;border-bottom:1px solid var(--line-2)}
+  .hist.paiet td{padding:0;border:0;display:flex;flex-direction:column;gap:1px;min-width:0;overflow-wrap:anywhere}
+  .hist.paiet td::before{content:attr(data-l);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+  .hist.paiet .num{text-align:left}
+  .paiet td[colspan],.paiet td:first-child{grid-column:1/-1}.paiet td[colspan]::before,.paiet td:first-child::before{display:none}
+  .hist.paiet tr.gapdet{display:block;padding:0 0 8px}.hist.paiet tr.gapdet>td{display:block}
+  .gapdet>td>.gaprep{width:auto}.gaprep dl{grid-template-columns:1fr}.gaprep dd{text-align:left;padding-left:0;max-width:none}.gaprep dt{border-bottom:0;padding-bottom:0}
+  .ienum,#ieCard .ienum{width:100%;max-width:140px}
+}
 .pmis ul{margin:0;padding-left:18px}.pmis li{margin:2px 0}
 </style>
 
@@ -1413,7 +1430,7 @@ const isEditing = sel => { const a = document.activeElement; return !!(a && a.cl
 function refreshToolView(){
   if (step === 'notes' && !isEditing('#notesBody')) renderNOTES();
   if (step === 'tir' && !isEditing('[data-page="tir"]')) renderTIR();
-  if (step === 'paie') renderPAIE(); if (step === 'paied') renderPAIED();
+  if (step === 'paie') renderPAIE(); if (step === 'paied') { renderPAIED(); autoLabel($('[data-page=paied]')); }
   if (step === 'mad') renderMAD(); if (step === 'madm' && !isEditing('#madRows')) renderMADM();
   if (step === 'cl') renderCL(); if (step === 'clm') renderCLM();
   if (step === 'sum') renderSUM(); if (step === 'sumd') renderSUMD(); if (step === 'apps') renderApps();
@@ -1734,7 +1751,7 @@ function go(n){
   if (n === 'note') renderNOTE();
   if (n === 'tir') renderTIR();
   if (n === 'paie') renderPAIE();
-  if (n === 'paied') renderPAIED();
+  if (n === 'paied') { renderPAIED(); autoLabel($('[data-page=paied]')); }
   if (n === 'exp') renderEXP();
   $$('#steps button').forEach(b => {
     const k = +b.dataset.go; b.setAttribute('aria-current', k === n ? 'step' : 'false');
@@ -3614,13 +3631,13 @@ function ieReport(I, y, o, det, c){
   h += `<h4>4 · Formulaire et paiement${ref('paiement')}</h4>` + dl([
     ['Formulaire', c.dl ? `${esc(I.form || 'formulaire')} pour le <b>${dFr(c.dl)}</b>` : '—'],
     ['Paiement', `avec la paie de ${moisLbl(c.y1 + '-' + c.mo)}`],
-    ['Contrôle', !c.slip ? 'fiche pas encore importée' : c.L.length ? `payé ${eur(c.mt)} · écart ${sgn(c.mt - c.est)} vs estimation` : '<span class="pneg">aucune ligne trouvée sur la fiche</span>']]);
-  if (!(c.k !== 1 || (st.perso.ie && st.perso.ie[y] && st.perso.ie[y].k))) h += `<p class="note">K = 1 par défaut : demande aux RH le coefficient de tes zones / durées pour une estimation fiable.</p>`;
+    ['Contrôle', !c.slip ? 'fiche pas encore importée' : c.L.length ? `payé ${eur(c.mt)} · écart ${sgn(c.mt - c.est)} vs estimation` : '<span class="pneg">aucune ligne trouvée sur la fiche</span>']].concat(c.slip && c.L.length ? (() => { const base = det.reduce((s, m) => s + m.j * Math.max(0, m.J - c.sub), 0); return base ? [['K implicite <small>payé / Σ jours × (J − frais)</small>', `<span class="mark">${h2(c.mt / base)}</span>`]] : []; })() : []));
+  if (!(c.k !== 1 || (st.perso.ie && st.perso.ie[y] && st.perso.ie[y].k))) h += `<p class="note">K = 1 par défaut (valeur neutre, non fixée par la politique) : demande aux RH la grille de K par durée et zone, ou importe la fiche de janvier qui a payé l’indemnité : l’app en déduit le K implicite.</p>`;
   return h + '</div>';
 }
-$('#ieBody').addEventListener('click', e => { if (e.target.closest('input')) return; const tr = e.target.closest('tr[data-ierow]'); if (!tr) return; const y = tr.dataset.ierow; ieOpen.has(y) ? ieOpen.delete(y) : ieOpen.add(y); renderIE(); });
+$('#ieBody').addEventListener('click', e => { if (e.target.closest('input')) return; const tr = e.target.closest('tr[data-ierow]'); if (!tr) return; const y = tr.dataset.ierow; ieOpen.has(y) ? ieOpen.delete(y) : ieOpen.add(y); renderIE(); autoLabel($('#ieCard')); });
 $('#ieBody').addEventListener('change', e => { const el = e.target.closest('[data-iey]'); if (!el) return; const P = st.perso.ie = st.perso.ie || {}; const y = el.dataset.iey;
-  P[y] = { ...(P[y] || {}), [el.dataset.iek]: el.value }; Store.saveProfil(); setTimeout(renderIE, 0); });
+  P[y] = { ...(P[y] || {}), [el.dataset.iek]: el.value }; Store.saveProfil(); setTimeout(() => { renderIE(); autoLabel($('#ieCard')); }, 0); });
 /* --- politique interne (fichier de règles chargé par l'utilisateur, gardé dans la db) --- */
 async function policyImport(f){
   try { if (/\.pdf$/i.test(f.name)) throw new Error('pdf');
@@ -3640,6 +3657,10 @@ $('#polDel').addEventListener('click', () => { const old = st.cfg.policy; if (!o
 function renderPol(){ const P = st.cfg && st.cfg.policy;
   $('#polInfo').innerHTML = P ? `<b>${esc(P.name)}</b>${P.version ? ` · version ${esc(P.version)}` : ''} <small class="note">(${P.rules.length} règle${P.rules.length > 1 ? 's' : ''} de contrôle${P.ie ? ', ' + esc(P.ie.label || 'indemnité annuelle') : ''})</small>` : '<span class="note">Aucune politique chargée : les contrôles allowances et le suivi d’indemnité annuelle sont désactivés.</span>';
   $('#polDel').hidden = !P; }
+
+/* libellés des colonnes pour l'affichage mobile (cartes) */
+function autoLabel(root){ (root || document).querySelectorAll('table.hist.paiet').forEach(t => { const hs = t.tHead ? [...t.tHead.rows[0].cells].map(th => th.textContent.trim()) : []; if (!hs.length || !t.tBodies[0]) return;
+  for (const tr of t.tBodies[0].rows) { const cs = [...tr.cells]; if (cs.some(td => td.colSpan > 1)) continue; cs.forEach((td, i) => { if (!td.dataset.l && hs[i]) td.dataset.l = hs[i]; }); } }); }
 
 /* --- vues --- */
 const sgn = (x, cls = true) => `<span class="${cls ? (x < -0.005 ? 'pneg' : x > 0.005 ? 'ppos' : '') : ''}">${x > 0.005 ? '+' : ''}${eur(x)}</span>`;
@@ -3664,6 +3685,7 @@ function renderPAIE(){
   renderGrille(L);
   renderIE();
   renderPol();
+  autoLabel($('[data-page=paie]'));
 }
 $('#paieGap').addEventListener('click', e => { const tr = e.target.closest('tr[data-gid]'); if (!tr) return; const id = tr.dataset.gid; gapOpen.has(id) ? gapOpen.delete(id) : gapOpen.add(id); renderPAIE(); });
 $('#paieYear').addEventListener('change', e => { paieYear = e.target.value; renderPAIE(); });
