@@ -842,7 +842,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
       <h2>Historique <span class="tag" id="histCount"></span></h2>
       <div class="tablebox" style="border:0;border-radius:0">
         <table class="hist">
-          <thead><tr><th>Mission</th><th class="num">H. payées</th><th class="num">H. récup</th><th>Mise en signature</th><th>Payé / heures attribuées</th><th>Statut</th><th></th></tr></thead>
+          <thead><tr><th>Mission</th><th class="num">H. payées</th><th class="num">H. récup</th><th>Mise en signature</th><th>Comptabilisée le</th><th>Statut</th><th></th></tr></thead>
           <tbody id="histBody"></tbody>
         </table>
       </div>
@@ -1771,28 +1771,28 @@ function renderHome(){
     if (x.saisi) { const part = d.params && d.params.paiement === 'partiel'; const maj = (x.hs || 0) * (x.coef || 0); const rec = part ? (x.recup || 0) : 0;
       a.hs += x.hs || 0; a.rec += rec; a.paid += Math.max(0, maj - rec); }
     return a; }, {n:0,j:0,j7:0,hs:0,rec:0,paid:0,brut:0,allow:0,p:{}});
-  const S = statsOf(list);
+  const okd = L => L.filter(([, d]) => d.payDate), S = statsOf(okd(list)), W = statsOf(list.filter(([, d]) => !d.payDate));
   const cy = String(new Date().getFullYear());
   $('#yearTable').innerHTML = `<table class="ytab"><thead><tr><th>Année</th><th class="num">Missions</th><th class="num">Jours</th><th class="num">H. payées</th><th class="num">H. récup</th></tr></thead><tbody>${
-    years.map(y => { const T = statsOf(all.filter(([,d]) => d.sum.depart.slice(0,4) === y));
-      return `<tr data-y="${y}" class="${y===year?'sel':''}"><td><b>${y}</b>${y===cy?' <span class="pill sign">en cours</span>':''}</td><td class="num">${T.n}</td><td class="num">${T.j}</td><td class="num">${h2(T.paid)}</td><td class="num">${h2(T.rec)}</td></tr>`; }).join('')}</tbody></table>`;
+    years.map(y => { const T = statsOf(okd(all.filter(([,d]) => d.sum.depart.slice(0,4) === y)));
+      return `<tr data-y="${y}" class="${y===year?'sel':''}"><td><b>${y}</b>${y===cy?' <span class="pill sign">en cours</span>':''}</td><td class="num">${T.n}</td><td class="num">${T.j}</td><td class="num">${h2(T.paid)}</td><td class="num">${h2(T.rec)}</td></tr>`; }).join('')}</tbody></table><p class="note" style="margin:6px 2px 0;font-size:12px">Totaux : missions comptabilisées uniquement (date « Comptabilisée le » remplie).</p>`;
   const lbl = year === 'all' ? 'au total' : 'en ' + year;
   const recPct = Math.min(100, S.rec / 156 * 100);
   $('#stats').innerHTML = `
-    <div class="kpi hero tap ${evo.metric==='j'?'on':''}" data-metric="j" role="button" tabindex="0"><div class="k">Jours de mission ${lbl}</div><div class="v">${S.j}<small>j</small></div><div class="sub">${S.n} mission${S.n>1?'s':''} · ${hShort(S.j7)} j d’éloignement (annexe 7)</div><div class="more">Voir l’évolution ›</div></div>
-    <div class="kpi hero tap ${evo.metric==='paid'?'on':''}" data-metric="paid" role="button" tabindex="0"><div class="k">Heures payées ${lbl}</div><div class="v">${h2(S.paid)}<small>h</small></div><div class="more">Voir l’évolution ›</div></div>
-    <div class="kpi hero tap ${evo.metric==='rec'?'on':''}" data-metric="rec" role="button" tabindex="0"><div class="k">Heures récupérées ${lbl}</div><div class="v">${h2(S.rec)}<small>h</small></div><div class="more">Voir l’évolution ›</div></div>`;
-  renderEvo(all);
+    <div class="kpi hero tap ${evo.metric==='j'?'on':''}" data-metric="j" role="button" tabindex="0"><div class="k">Jours de mission ${lbl}</div><div class="v">${S.j}<small>j</small></div><div class="sub">${S.n} mission${S.n>1?'s':''} comptabilisée${S.n>1?'s':''} · ${hShort(S.j7)} j d’éloignement (annexe 7)${W.n ? `<br>+ ${W.n} en attente (${W.j} j)` : ''}</div><div class="more">Voir l’évolution ›</div></div>
+    <div class="kpi hero tap ${evo.metric==='paid'?'on':''}" data-metric="paid" role="button" tabindex="0"><div class="k">Heures payées ${lbl}</div><div class="v">${h2(S.paid)}<small>h</small></div>${W.paid ? `<div class="sub">+ ${h2(W.paid)} h en attente de comptabilisation</div>` : ''}<div class="more">Voir l’évolution ›</div></div>
+    <div class="kpi hero tap ${evo.metric==='rec'?'on':''}" data-metric="rec" role="button" tabindex="0"><div class="k">Heures récupérées ${lbl}</div><div class="v">${h2(S.rec)}<small>h</small></div>${W.rec ? `<div class="sub">+ ${h2(W.rec)} h en attente de comptabilisation</div>` : ''}<div class="more">Voir l’évolution ›</div></div>`;
+  renderEvo(okd(all));
   $('#countries').innerHTML = Object.entries(S.p).sort((a,b)=>b[1]-a[1]).map(([p,j]) => `<li>${esc(p)}<b>${j} j</b></li>`).join('');
   $('#histCount').textContent = list.length ? `${list.length} mission${list.length>1?'s':''}` : '';
   $('#histBody').innerHTML = list.map(([id,d]) => { const x = d.sum, h = hoursOf(d);
-    const status = d.payDate ? '<span class="pill done">Payé</span>' : d.signDate ? '<span class="pill sign">En signature</span>' : d.exported ? '<span class="pill draft">À signer</span>' : (x.saisi ? '<span class="pill draft">À exporter</span>' : '<span class="pill draft">Heures à saisir</span>');
+    const status = d.payDate ? '<span class="pill done">Comptabilisée</span>' : d.signDate ? '<span class="pill sign">En signature</span>' : d.exported ? '<span class="pill draft">À signer</span>' : (x.saisi ? '<span class="pill draft">À exporter</span>' : '<span class="pill draft">Heures à saisir</span>');
     return `<tr data-id="${esc(id)}">
     <td class="when" data-l="Mission"><b>${d.mission.nom ? esc(d.mission.nom) : dFr(x.depart).slice(0,5) + ' → ' + dFr(x.retour)}</b><span>${d.mission.nom ? dFr(x.depart).slice(0,5) + ' → ' + dFr(x.retour) + ' · ' : ''}${esc(x.ville || x.pays)} · ${x.N} j</span></td>
     <td class="num" data-l="H. payées">${x.saisi ? hShort(h.paid) : '—'}</td>
     <td class="num" data-l="H. récup">${x.saisi ? hShort(h.rec) : '—'}</td>
     <td data-l="Mise en signature"><input type="date" class="dt" data-f="signDate" value="${esc(d.signDate || '')}" aria-label="Date de mise en signature"></td>
-    <td data-l="Payé / heures attribuées"><input type="date" class="dt" data-f="payDate" value="${esc(d.payDate || '')}" aria-label="Date de paiement ou d’attribution des heures"></td>
+    <td data-l="Comptabilisée le"><input type="date" class="dt" data-f="payDate" value="${esc(d.payDate || '')}" aria-label="Date de comptabilisation (mission validée, heures attribuées)"></td>
     <td data-l="Statut">${status}</td>
     <td class="acts"><div class="rowacts"><button class="btn" type="button" data-act="open">Ouvrir</button><button class="btn danger" type="button" data-act="del" aria-label="Supprimer">✕</button></div></td>
   </tr>`; }).join('');
@@ -2762,7 +2762,7 @@ function sumDates(x){
   const ds = [...x.h.map(o => [o.d.sum.depart, o.d.sum.retour]), ...x.cl.map(l => [l.depart, l.retour]), ...x.mad.map(m => [m.date, m.date])].flat().filter(Boolean).sort();
   return ds.length ? [ds[0], ds[ds.length - 1]] : ['', ''];
 }
-function heuresStatus(d){ return d.payDate ? 'Payé' : d.signDate ? 'En signature' : d.exported ? 'À signer' : (d.sum.saisi ? 'À exporter' : 'Heures à saisir'); }
+function heuresStatus(d){ return d.payDate ? 'Comptabilisée' : d.signDate ? 'En signature' : d.exported ? 'À signer' : (d.sum.saisi ? 'À exporter' : 'Heures à saisir'); }
 let sumKey = null;
 function renderSUM(){
   const g = [...allNamed().values()].map(x => ({ ...x, dates: sumDates(x) })).sort((a, b) => (b.dates[0] || '').localeCompare(a.dates[0] || ''));
@@ -2823,7 +2823,7 @@ function renderSUMD(){
   const dl = rows => `<dl>${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
   $('#sumH').innerHTML = M.h.length ? M.h.map(h => dl([['Période', h.periode], ['Lieu', esc(h.lieu)], ['Client', esc(h.client || '—')], ['Jours (éloignement)', `${h.jours} (${hShort(h.j7)})`],
       ['Heures payées', h.paid != null ? h2(h.paid) + ' h' : '—'], ['Heures récupérées', h.rec != null ? h2(h.rec) + ' h' : '—'], ['Coefficient', h.coef != null ? h2(h.coef) : '—'],
-      ['Statut', h.statut], ['Mise en signature', h.sign ? dFr(h.sign) : '—'], ['Payé / heures attribuées', h.pay ? dFr(h.pay) : '—']])).join('<hr class="sep">') : '<p class="note">Aucune feuille d’heures avec ce nom de mission.</p>';
+      ['Statut', h.statut], ['Mise en signature', h.sign ? dFr(h.sign) : '—'], ['Comptabilisée le', h.pay ? dFr(h.pay) : '—']])).join('<hr class="sep">') : '<p class="note">Aucune feuille d’heures avec ce nom de mission.</p>';
   $('#sumC').innerHTML = M.cl.length ? M.cl.map(c => `<p><b>${esc(c.title)}</b> · ${c.done} / ${c.n} prêts</p><div class="prog big"><i style="width:${c.n ? c.done / c.n * 100 : 0}%"></i></div>${c.todo.length ? `<p class="note" style="margin:10px 0 4px">Encore à préparer :</p><ul class="todo">${c.todo.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '<p class="note">Tout est prêt.</p>'}`).join('<hr class="sep">') : '<p class="note">Aucune check-list avec ce nom de mission.</p>';
   $('#sumT').innerHTML = M.tir.length ? `<p><b>${M.tir.reduce((s, t) => s + t.cps, 0).toLocaleString('fr-BE')}</b> coups en ${M.tir.length} tir${M.tir.length > 1 ? 's' : ''}</p><div class="tablebox"><table class="ytab"><thead><tr><th>Date</th><th>Arme</th><th>Essai</th><th class="num">Coups</th><th>Remarques</th></tr></thead><tbody>${M.tir.map(t => `<tr><td>${t.date ? dFr(t.date) : '—'}</td><td>${esc(t.arme)}</td><td>${esc(t.essai)}</td><td class="num">${t.cps}</td><td>${esc(t.rem)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="note">Aucun tir avec ce nom de mission.</p>';
   $('#sumN').innerHTML = M.note.length ? M.note.map(n => `<p><b>${n.date ? dFr(n.date) : 'Sans date'}</b>${n.title ? ' · ' + esc(n.title) : ''}</p><div class="notetxt">${esc(n.body)}</div>`).join('<hr class="sep">') : '<p class="note">Aucune note avec ce nom de mission.</p>';
@@ -2866,7 +2866,7 @@ async function sumPdf(){
   const who = [st.perso.nom, st.perso.prenom].filter(Boolean).join(' '); if (who) para(`${who}${st.perso.matricule ? ' · matricule ' + st.perso.matricule : ''}`, { size: 9.5, color: grey });
   sec('Heures Mission');
   if (!M.h.length) para('Aucune feuille d’heures avec ce nom de mission.', { color: grey });
-  M.h.forEach((h, i) => { if (i) y -= 6; kv([['Période', h.periode], ['Lieu', h.lieu], ['Client', h.client || '—'], ['Jours (éloignement)', `${h.jours} (${hShort(h.j7)})`], ['Heures payées', h.paid != null ? h2(h.paid) + ' h' : '—'], ['Heures récupérées', h.rec != null ? h2(h.rec) + ' h' : '—'], ['Coefficient', h.coef != null ? h2(h.coef) : '—'], ['Statut', h.statut], ['Mise en signature', h.sign ? dFr(h.sign) : '—'], ['Payé / heures attribuées', h.pay ? dFr(h.pay) : '—']]); });
+  M.h.forEach((h, i) => { if (i) y -= 6; kv([['Période', h.periode], ['Lieu', h.lieu], ['Client', h.client || '—'], ['Jours (éloignement)', `${h.jours} (${hShort(h.j7)})`], ['Heures payées', h.paid != null ? h2(h.paid) + ' h' : '—'], ['Heures récupérées', h.rec != null ? h2(h.rec) + ' h' : '—'], ['Coefficient', h.coef != null ? h2(h.coef) : '—'], ['Statut', h.statut], ['Mise en signature', h.sign ? dFr(h.sign) : '—'], ['Comptabilisée le', h.pay ? dFr(h.pay) : '—']]); });
   sec('Check-list voyage');
   if (!M.cl.length) para('Aucune check-list avec ce nom de mission.', { color: grey });
   M.cl.forEach(c => { para(`${c.title} : ${c.done} / ${c.n} prêts`, { bold: true }); if (c.todo.length) { para('Encore à préparer :', { size: 9.5, color: grey }); c.todo.forEach(t => para('•  ' + t, { size: 9.5, x: MG + 8, w: W - 2 * MG - 8 })); } else para('Tout est prêt.', { size: 9.5, color: grey }); y -= 4; });
