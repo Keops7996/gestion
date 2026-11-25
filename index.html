@@ -434,6 +434,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 .gapwhy{margin:0;padding-left:18px}.gapwhy li{margin:4px 0}
 .ienum{width:84px;text-align:right}
 .hscap{font-size:13px;line-height:1.5;border-top:1px solid var(--line-2);padding-top:8px;margin-top:4px}
+.ref{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;text-transform:none;color:var(--navy);border:1px solid color-mix(in srgb,var(--navy) 35%,transparent);border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:1px}
 .pmis ul{margin:0;padding-left:18px}.pmis li{margin:2px 0}
 </style>
 
@@ -3577,8 +3578,9 @@ function renderIE(){
   $('#ieCard').querySelector('.tablebox').hidden = false;
   $('#ieTitle').textContent = I.label || 'Indemnité annuelle'; $('#ieNote').textContent = I.note || '';
   const by = {};
-  for (const [, d] of Store.missions) { if (!d || !d.sum || !d.sum.depart) continue; const y = d.sum.depart.slice(0, 4), j = +(d.sum.j7 ?? d.sum.N) || 0;
-    (by[y] = by[y] || { j: 0, n: 0, ms: [] }); by[y].j += j; by[y].n++; by[y].ms.push({ name: (d.mission && d.mission.nom) || d.sum.ville || d.sum.pays, j, mois: d.sum.depart.slice(0, 7) }); }
+  for (const [, d] of Store.missions) { if (!d || !d.sum || !d.sum.depart) continue; const x = d.sum, y = x.depart.slice(0, 4), N = +x.N || 0, j7 = +(x.j7 ?? x.N) || 0;
+    const same = I.excludeSameDay && (x.depart === x.retour || N <= 1), j = same ? 0 : j7;
+    (by[y] = by[y] || { j: 0, n: 0, ms: [] }); by[y].j += j; by[y].n++; by[y].ms.push({ name: (d.mission && d.mission.nom) || x.ville || x.pays, j, N, ded: Math.max(0, N - j7), same, pays: x.pays, depart: x.depart, retour: x.retour || x.depart, mois: x.depart.slice(0, 7) }); }
   const yrs = Object.keys(by).sort().reverse(), today = todayIso(), min = +I.minDays || 0, mo = String(I.payMonth || 1).padStart(2, '0'), re = new RegExp(I.line || '^$', 'i');
   const P = st.perso.ie = st.perso.ie || {};
   $('#ieBody').innerHTML = yrs.map(y => { const o = by[y], ok = o.j > min, y1 = String(+y + 1), slip = st.paies.find(p => p.mois === y1 + '-' + mo);
@@ -3588,13 +3590,35 @@ function renderIE(){
     const tip = det.map(m => `${m.name} : ${h2(m.j)} j × ${h2(k)} × (${eur(m.b.v)}/30 − ${eur(sub)}) = ${eur(m.v)}`).join('\n');
     const pay = !ok ? '<span class="note">—</span>' : slip ? (L.length ? `<span class="pst ok">Payée : ${eur(mt)}</span>${est ? ` <small class="note">(${sgn(mt - est)} vs estim.)</small>` : ''}` : `<span class="pst ko">Absente de la fiche de ${moisLbl(y1 + '-' + mo)}</span>`) : `<span class="pst wa">À vérifier sur la fiche de ${moisLbl(y1 + '-' + mo)}</span>`;
     const dl = I.deadline ? `${y1}-${I.deadline}` : '', form = !ok || !dl ? '' : `${esc(I.form || 'formulaire')} pour le <b>${dFr(dl)}</b>${today > dl ? ' <small class="note">(dépassé)</small>' : ''}`;
-    return `<tr><td><b>${y}</b></td><td class="num">${h2(o.j)} j <span class="sub">${o.n} mission${o.n > 1 ? 's' : ''}</span></td><td>${ok ? `<span class="pst ok">Oui (&gt; ${min} j)</span>` : `<span class="note">Non (${h2(min - o.j)} j manquants)</span>`}</td>
+    const open = ieOpen.has(y);
+    return `<tr class="gaprow${open ? ' open' : ''}" data-ierow="${y}" title="Cliquer pour le détail du calcul"><td><b>${y}</b> <span class="gapchev">${open ? '▴' : '▾'}</span></td><td class="num">${h2(o.j)} j <span class="sub">${o.n} mission${o.n > 1 ? 's' : ''}</span></td><td>${ok ? `<span class="pst ok">Oui (&gt; ${min} j)</span>` : `<span class="note">Non (${h2(min - o.j)} j manquants)</span>`}</td>
       <td class="num"><input class="ienum" type="number" step="0.01" min="0" data-iey="${y}" data-iek="k" value="${esc(cfg.k ?? '')}" placeholder="${h2(num(I.k ?? 1))}" aria-label="Coefficient K ${y}"></td>
       <td class="num"><input class="ienum" type="number" step="0.01" min="0" data-iey="${y}" data-iek="sub" value="${esc(cfg.sub ?? '')}" placeholder="${h2(num(I.sub ?? 0))}" aria-label="Frais non engagés par jour ${y}"></td>
       <td class="num" title="${esc(tip)}">${det.some(m => !m.b.v) ? '<span class="note">salaire inconnu : importe une fiche de paie</span>' : (ok ? `<b>${eur(est)}</b>` : `<span class="note" style="text-decoration:line-through">${eur(est)}</span>`) + `<span class="sub">${ok ? '' : 'pas de droit (≤ ' + min + ' j) · '}${det.length} mission${det.length > 1 ? 's' : ''} · survol = détail</span>`}</td>
-      <td>${form || '<span class="note">—</span>'}</td><td>${pay}</td></tr>`; }).join('')
+      <td>${form || '<span class="note">—</span>'}</td><td>${pay}</td></tr>${open ? `<tr class="gapdet"><td colspan="8">${ieReport(I, y, o, det, { ok, min, k, sub, est, slip, L, mt, y1, mo, dl })}</td></tr>` : ''}`; }).join('')
     || `<tr><td colspan="8" class="note" style="padding:16px">Aucune mission encodée.</td></tr>`;
 }
+const ieOpen = new Set();
+function ieReport(I, y, o, det, c){
+  const R = I.refs || {}, ref = k => R[k] ? ` <span class="ref">${esc(R[k])}</span>` : '', dl = rows => `<dl>${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
+  let h = `<div class="gaprep rows">`;
+  h += `<h4>1 · Droit à l’indemnité${ref('droit')}</h4>` + dl([
+    ['Condition', esc(I.droitTxt || `plus de ${c.min} jours hors Belgique sur l’année civile`)],
+    [`Jours retenus en ${y}`, `${det.map(m => h2(m.j)).join(' + ')} = <b>${h2(o.j)} j</b>`],
+    ['Résultat', c.ok ? `<span class="ppos"><b>droit ouvert</b> (${h2(o.j)} j &gt; ${c.min} j)</span>` : `<span class="pneg">pas de droit : il manque ${h2(c.min - o.j)} j</span>`]]);
+  h += `<h4>2 · Jours retenus par mission${ref('jours')}</h4><div class="tablebox"><table class="hist paiet"><thead><tr><th>Mission</th><th>Période</th><th class="num">Jours</th><th class="num">Déduits</th><th class="num">Retenus</th></tr></thead><tbody>${det.map(m => `<tr><td><b>${esc(m.name)}</b><span class="sub">${esc(m.pays || '')}</span></td><td>${dFr(m.depart)} → ${dFr(m.retour)}</td><td class="num">${h2(m.N)}</td><td class="num">${m.same ? '<span class="pneg">tous</span>' : m.ded ? '− ' + h2(m.ded) : '—'}</td><td class="num"><b>${h2(m.j)}</b></td></tr>`).join('')}</tbody></table></div>`;
+  if (I.exclusions && I.exclusions.length) h += `<p class="note" style="margin:6px 0 0">Ne comptent pas${ref('exclusions')} : ${I.exclusions.map(esc).join(' ; ')}.${det.some(m => m.same) ? ' Missions aller-retour le même jour exclues automatiquement.' : ''} Les jours « déduits » viennent de l’annexe 7 de chaque mission (week-ends / fériés non imposés, demi-jours).</p>`;
+  if (I.limitrophe) h += `<p class="note" style="margin:4px 0 0">${esc(I.limitrophe)}${ref('limitrophe')}</p>`;
+  h += `<h4>3 · Calcul${ref('formule')}</h4><p class="note" style="margin:0 0 6px">${esc(I.formule || 'jours × K × (J − frais/jour)')} — K : ${esc(I.kTxt || 'coefficient')}${ref('k')} · J : ${esc(I.jTxt || 'salaire mensuel brut / 30')}${ref('j')} · ${eur(c.sub)} : ${esc(I.subTxt || 'frais journaliers non engagés')}${ref('sub')}</p>`;
+  h += `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Mission</th><th class="num">Salaire du mois</th><th class="num">J = salaire / 30</th><th class="num">J − ${eur(c.sub)}</th><th class="num">× K</th><th class="num">× jours</th><th class="num">Montant</th></tr></thead><tbody>${det.map(m => `<tr><td>${esc(m.name)}</td><td class="num">${eur(m.b.v)}<span class="sub">${m.b.src ? 'fiche ' + moisLbl(m.b.src) : 'profil'}</span></td><td class="num">${eur(m.J)}</td><td class="num">${eur(Math.max(0, m.J - c.sub))}</td><td class="num">${h2(c.k)}</td><td class="num">${h2(m.j)}</td><td class="num"><b>${eur(m.v)}</b></td></tr>`).join('')}<tr><td colspan="6"><b>Total estimé ${y}</b></td><td class="num"><b>${eur(c.est)}</b></td></tr></tbody></table></div>`;
+  h += `<h4>4 · Formulaire et paiement${ref('paiement')}</h4>` + dl([
+    ['Formulaire', c.dl ? `${esc(I.form || 'formulaire')} pour le <b>${dFr(c.dl)}</b>` : '—'],
+    ['Paiement', `avec la paie de ${moisLbl(c.y1 + '-' + c.mo)}`],
+    ['Contrôle', !c.slip ? 'fiche pas encore importée' : c.L.length ? `payé ${eur(c.mt)} · écart ${sgn(c.mt - c.est)} vs estimation` : '<span class="pneg">aucune ligne trouvée sur la fiche</span>']]);
+  if (!(c.k !== 1 || (st.perso.ie && st.perso.ie[y] && st.perso.ie[y].k))) h += `<p class="note">K = 1 par défaut : demande aux RH le coefficient de tes zones / durées pour une estimation fiable.</p>`;
+  return h + '</div>';
+}
+$('#ieBody').addEventListener('click', e => { if (e.target.closest('input')) return; const tr = e.target.closest('tr[data-ierow]'); if (!tr) return; const y = tr.dataset.ierow; ieOpen.has(y) ? ieOpen.delete(y) : ieOpen.add(y); renderIE(); });
 $('#ieBody').addEventListener('change', e => { const el = e.target.closest('[data-iey]'); if (!el) return; const P = st.perso.ie = st.perso.ie || {}; const y = el.dataset.iey;
   P[y] = { ...(P[y] || {}), [el.dataset.iek]: el.value }; Store.saveProfil(); setTimeout(renderIE, 0); });
 /* --- politique interne (fichier de règles chargé par l'utilisateur, gardé dans la db) --- */
