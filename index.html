@@ -3260,8 +3260,8 @@ if (!Array.isArray(st.paies)) st.paies = [];
 const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const moisLbl = ym => { const [y, m] = String(ym || '').split('-'); return m ? `${MOIS_FR[+m - 1]} ${y}` : '—'; };
 const moisCap = ym => { const s = moisLbl(ym); return s.charAt(0).toUpperCase() + s.slice(1); };
-const PCATS = { mission: 'Mission', hs: 'Heures sup.', base: 'Salaire', autre: 'Autre' };
-const PCYCLE = ['mission', 'hs', 'base', 'autre'];
+const PCATS = { mission: 'Mission', hs: 'Heures sup.', recup: 'Récup HS (hors mission)', base: 'Salaire', autre: 'Autre' };
+const PCYCLE = ['mission', 'hs', 'recup', 'base', 'autre'];
 const pnum = s => { s = String(s || '').trim(); if (!/^-?[\d.]*\d(,\d+)?-?$/.test(s)) return null; const neg = s.endsWith('-') || s.startsWith('-'); const v = parseFloat(s.replace(/-/g, '').replace(/\./g, '').replace(',', '.')); return isFinite(v) ? (neg ? -v : v) : null; };
 const pct = x => isFinite(x) ? (x * 100).toLocaleString('fr-BE', { maximumFractionDigits: 1 }) + ' %' : '—';
 let paieId = null, paieYear = '';
@@ -3338,6 +3338,7 @@ function parsePaie(items){
 function pcat(L){
   const map = (st.cfg && st.cfg.paieMap) || {}, k = normTxt(L.label); if (map[k]) return map[k];
   if (L.sec && L.sec !== 'brut') return 'autre';
+  if (/recup.*(hres|heures|h\.)\s*sup|recup.*suppl/.test(k)) return 'recup';        // heures du contingent prises en récupération : hors mission
   if (/mission|sejour|etranger|expat|allowance|deplacement|grand deplac/.test(k)) return 'mission';
   if (/suppl|\bhs\b|sursalaire|majoration|heures sup|overtime/.test(k)) return 'hs';
   if (/remuneration|salaire|appointement/.test(k)) return 'base';
@@ -3349,7 +3350,7 @@ function paieCalc(p){
   const sum = f => p.lines.filter(f).reduce((s, L) => s + (L.mt || 0), 0);
   const prec = -sum(isPrec), onss = -sum(isOnss);
   const mis = p.lines.filter(L => L.sec === 'brut' && ['mission', 'hs'].includes(pcat(L)));
-  const misMt = mis.reduce((s, L) => s + (L.mt || 0), 0), misH = mis.filter(L => pcat(L) === 'hs').reduce((s, L) => s + (L.h || 0), 0);
+  const misMt = mis.reduce((s, L) => s + (L.mt || 0), 0), misH = mis.reduce((s, L) => s + (L.h || 0), 0);
   const hsCom = p.comm.filter(L => /\bhs\b|suppl/.test(normTxt(L.label)) && !/non pay/.test(normTxt(L.label))).reduce((s, L) => s + (L.h || 0), 0);
   const b = p.tot.brut || 0, imp = p.tot.imposable || 0, net = p.tot.net || 0;
   return { prec, onss, mis, misMt, misH, hsCom, brut: b, imp, net, tx: imp ? prec / imp : NaN, txOnss: b ? onss / b : NaN };
@@ -3369,11 +3370,13 @@ function misList(){
 function gapCalc(){
   const M = misList(), paid = {}, paidH = {}, expM = {}, src = {};
   const add = (k, o) => (src[k] = src[k] || []).push(o);
-  for (const p of st.paies) for (const L of paieCalc(p).mis) { const k = L.per || p.mois, c = pcat(L); paid[k] = (paid[k] || 0) + (L.mt || 0); if (c === 'hs') paidH[k] = (paidH[k] || 0) + (L.h || 0);
-    add(k, { kind: 'line', fiche: p.mois, code: L.code, label: L.label, h: L.h, mt: L.mt || 0, cat: c, countH: c === 'hs' }); }
+  for (const p of st.paies) for (const L of paieCalc(p).mis) { const k = L.per || p.mois, c = pcat(L); paid[k] = (paid[k] || 0) + (L.mt || 0); paidH[k] = (paidH[k] || 0) + (L.h || 0);   // heures payées : lignes Mission (ex. indemnité de mission) et Heures sup.
+    add(k, { kind: 'line', fiche: p.mois, code: L.code, label: L.label, h: L.h, mt: L.mt || 0, cat: c, countH: !!L.h }); }
   { const com = {}; for (const p of st.paies) for (const L of p.comm) { const k = normTxt(L.label); if (L.h && L.per && /\bhs\b|suppl/.test(k) && !/non pay/.test(k)) { const kk = k + '|' + L.per; (com[kk] = com[kk] || []).push({ fiche: p.mois, label: L.label, h: L.h, per: L.per }); } }
-    for (const arr of Object.values(com)) { const best = arr.reduce((a, b) => b.h > a.h ? b : a); const k = best.per; paidH[k] = (paidH[k] || 0) + best.h; if (paid[k] === undefined) paid[k] = 0;
-      for (const o of arr) add(k, { kind: 'comm', fiche: o.fiche, label: o.label, h: o.h, mt: 0, countH: o === best, dup: o !== best }); } }
+    // la communication (ex. « HS avec réduction fiscale ») recompte des heures déjà payées : on ne l'utilise que si elle dépasse les lignes de paie
+    for (const arr of Object.values(com)) { const best = arr.reduce((a, b) => b.h > a.h ? b : a); const k = best.per, lineH = paidH[k] || 0, use = best.h > lineH + 0.005;
+      if (use) { paidH[k] = best.h; (src[k] || []).forEach(o => { if (o.kind === 'line') o.countH = false; }); } if (paid[k] === undefined) paid[k] = 0;
+      for (const o of arr) add(k, { kind: 'comm', fiche: o.fiche, label: o.label, h: o.h, mt: 0, countH: use && o === best, dup: o !== best, info: !use && o === best }); } }
   for (const m of M) for (const [k, n] of Object.entries(m.months)) expM[k] = (expM[k] || 0) + m.exp * n / m.n;
   const hsM = {}; for (const m of M) for (const [k, n] of Object.entries(m.months)) hsM[k] = (hsM[k] || 0) + m.hsExp * n / m.n;
   for (const m of M) { m.paid = 0; m.paidH = 0; m.seen = false; m.per = [];
@@ -3403,7 +3406,7 @@ function gapReport(m){
   h += `<h4>2 · Ce que disent les fiches de paie</h4><p class="note">L’app cherche, sur toutes les fiches importées, les lignes « Mission » et « Heures sup. » dont la <b>période</b> tombe pendant la mission, plus les heures sup de la partie « Communication ».</p>`;
   for (const P of m.per) {
     h += `<div class="pmis"><h5>${moisCap(P.k)} <small class="note">(${P.n} j de mission)</small></h5>`;
-    h += P.src.length ? `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Fiche</th><th>Ligne</th><th class="num">Heures</th><th class="num">Montant</th><th>Compté</th></tr></thead><tbody>${P.src.map(o => `<tr><td>${moisLbl(o.fiche)}</td><td>${esc(o.label)}${o.kind === 'comm' ? ' <small class="note">(communication)</small>' : ''}</td><td class="num">${o.h != null ? h2(o.h) : ''}</td><td class="num">${o.mt ? eur(o.mt) : '—'}</td><td>${o.dup ? '<span class="note">non (doublon d’une autre fiche)</span>' : [o.mt ? 'montant' : '', o.countH && o.h ? 'heures' : ''].filter(Boolean).join(' + ') || '<span class="note">montant</span>'}</td></tr>`).join('')}</tbody></table></div>`
+    h += P.src.length ? `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Fiche</th><th>Ligne</th><th class="num">Heures</th><th class="num">Montant</th><th>Compté</th></tr></thead><tbody>${P.src.map(o => `<tr><td>${moisLbl(o.fiche)}</td><td>${esc(o.label)}${o.kind === 'comm' ? ' <small class="note">(communication)</small>' : ''}</td><td class="num">${o.h != null ? h2(o.h) : ''}</td><td class="num">${o.mt ? eur(o.mt) : '—'}</td><td>${o.dup ? '<span class="note">non (doublon d’une autre fiche)</span>' : o.info ? '<span class="note">info (déjà compté dans les lignes de paie)</span>' : [o.mt ? 'montant' : '', o.countH && o.h ? 'heures' : ''].filter(Boolean).join(' + ') || '<span class="note">montant</span>'}</td></tr>`).join('')}</tbody></table></div>`
       : `<p class="note pneg" style="margin:4px 0">Aucune ligne trouvée pour cette période${m.age < 75 ? ' (normal si la fiche du mois suivant n’est pas encore là)' : ' : la fiche qui la paie n’est peut-être pas importée'}.</p>`;
     h += `<p class="note" style="margin:6px 0 0">Total ${moisLbl(P.k)} : ${eur(P.paid)} · ${h2(P.paidH)} h`;
     if (P.others.length) h += ` — partagé avec ${P.others.map(o => `« ${esc(o.name)} »`).join(', ')} : part de cette mission = ${pct(P.share)} des montants et ${pct(P.hshare)} des heures (au prorata de l’attendu)`;
@@ -3703,6 +3706,7 @@ function renderPAIED(){
       <ul>${per[k].map(L => `<li>${esc(L.label)}${L.h ? ` — ${h2(L.h)} h` : ''}${L.j ? ` — ${h2(L.j)} j` : ''} : <b>${eur(L.mt || 0)}</b> <small class="note">(${PCATS[pcat(L)]})</small></li>`).join('')}</ul>
       <div class="note" style="margin-top:4px">Total : <b>${eur(tot)}</b>${ms.length === 1 ? ` · attendu pour la mission : ${eur(ms[0].exp)} · HS après coef. : ${h2(ms[0].maj)} h, dont <b>${h2(ms[0].hsExp)} h payées</b> et <b>${h2(ms[0].rec)} h à récupérer</b>` : ''}</div></div>`; }).join('')
     || `<p class="note" style="margin:0">Aucune ligne « Mission » ou « Heures sup. » sur cette fiche. Si une ligne en est une, change sa catégorie plus bas.</p>`;
+  { const R = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup'); if (R.length) $('#pdMis').innerHTML += `<div class="pmis"><h4>Récupération d’heures sup du contingent <small class="note">(hors mission, non comparée aux missions)</small></h4><ul>${R.map(L => `<li>${esc(L.code)} ${esc(L.label)}${L.per ? ` — ${moisLbl(L.per)}` : ''}${L.h ? ` — ${h2(L.h)} h` : ''}${L.mt ? ` : ${eur(L.mt)}` : ''}</li>`).join('')}</ul></div>`; }
   if (c.hsCom) $('#pdMis').innerHTML += `<p class="note" style="margin:6px 0 0">Communication de la fiche : ${p.comm.filter(L => /\bhs\b|suppl/.test(normTxt(L.label)) && L.h).map(L => `${esc(L.label)} ${moisLbl(L.per)} : ${h2(L.h)} h`).join(' · ')}.</p>`;
   const yr = p.mois.slice(0, 4), hsY = misList().filter(m => m.depart.startsWith(yr)).reduce((s, m) => s + m.hsExp, 0), appNet = hsY > hsCap() ? 0.45 : 0.66;
   const rows = [['Taux de précompte du mois <small>précompte / imposable</small>', pct(c.tx)], ['Cotisation ONSS <small>/ brut</small>', pct(c.txOnss)], ['Net / brut', pct(c.brut ? c.net / c.brut : NaN)]];
