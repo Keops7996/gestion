@@ -1715,6 +1715,7 @@ function missionError(){
   return '';
 }
 function go(n){
+  try { applyPreset(); } catch(e) {}
   if (typeof n === 'number' && n >= 2 && n <= 4) { const err = missionError(); $('[data-err="1"]').textContent = err; if (err) n = 1; }
   if (step === 'note' && n !== 'note') dropEmptyNote();
   if (n !== 0 && step !== 0) backTo = n;
@@ -3642,15 +3643,24 @@ $('#ieBody').addEventListener('click', e => { if (e.target.closest('input')) ret
 $('#ieBody').addEventListener('change', e => { const el = e.target.closest('[data-iey]'); if (!el) return; const P = st.perso.ie = st.perso.ie || {}; const y = el.dataset.iey;
   P[y] = { ...(P[y] || {}), [el.dataset.iek]: el.value }; Store.saveProfil(); setTimeout(() => { renderIE(); autoLabel($('#ieCard')); }, 0); });
 /* --- politique interne (fichier de règles chargé par l'utilisateur, gardé dans la db) --- */
+function applyPolicy(J, fname){
+  st.cfg = st.cfg || {}; st.cfg.policy = { name: J.name || 'Politique interne', version: J.version || '', rules: J.rules || [], ie: J.ie || null, fichier: fname, loaded: new Date().toISOString() };
+  let n = 0; const c = st.cfg; if (Array.isArray(J.items) && Array.isArray(c.items)) { const have = new Set(c.items.map(it => normTxt(it.text)));
+    for (const x of J.items) { const text = String(x.text || '').trim(), cat = String(x.cat || 'Administratif').trim(); if (!text || have.has(normTxt(text))) continue;
+      if (!c.cats.includes(cat)) c.cats.splice(Math.max(0, c.cats.indexOf('Retour')) || c.cats.length, 0, cat);
+      c.items.push({ id: 'i' + Date.now().toString(36) + n, cat, text, tags: [] }); have.add(normTxt(text)); n++; } }
+  return n;
+}
+/* données préchargées d'une version privée (window.__PRESET__) : ajoutées une seule fois si absentes */
+function applyPreset(){ const P = window.__PRESET__; if (!P || !st.cfg) return; let ch = false;
+  const done = st.cfg.presetDone = st.cfg.presetDone || {}; done.g = done.g || [];
+  for (const g of P.grilles || []) if (!done.g.includes(g.date)) { if (!(st.cfg.grilles || []).some(x => x.date === g.date)) (st.cfg.grilles = st.cfg.grilles || []).push(g); done.g.push(g.date); ch = true; }
+  if (P.policy && !done.policy) { if (!st.cfg.policy) applyPolicy(P.policy, 'intégrée'); done.policy = true; ch = true; }
+  if (ch) Store.saveProfil(); }
 async function policyImport(f){
   try { if (/\.pdf$/i.test(f.name)) throw new Error('pdf');
     const J = JSON.parse(await f.text()); if (!J || J.type !== 'travel-policy') throw new Error('format');
-    st.cfg = st.cfg || {}; st.cfg.policy = { name: J.name || 'Politique interne', version: J.version || '', rules: J.rules || [], ie: J.ie || null, fichier: f.name, loaded: new Date().toISOString() };
-    let n = 0; const c = st.cfg; if (Array.isArray(J.items) && Array.isArray(c.items)) { const have = new Set(c.items.map(it => normTxt(it.text)));
-      for (const x of J.items) { const text = String(x.text || '').trim(), cat = String(x.cat || 'Administratif').trim(); if (!text || have.has(normTxt(text))) continue;
-        if (!c.cats.includes(cat)) c.cats.splice(Math.max(0, c.cats.indexOf('Retour')) || c.cats.length, 0, cat);
-        c.items.push({ id: 'i' + Date.now().toString(36) + n, cat, text, tags: [] }); have.add(normTxt(text)); n++; } }
-    Store.saveProfil(); $('#polMsg').innerHTML = ''; saveState(`${st.cfg.policy.name} chargée${n ? ` · ${n} élément${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} à la check-list` : ''}`);
+    const n = applyPolicy(J, f.name); Store.saveProfil(); $('#polMsg').innerHTML = ''; saveState(`${st.cfg.policy.name} chargée${n ? ` · ${n} élément${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} à la check-list` : ''}`);
   } catch(e) { $('#polMsg').innerHTML = `<div class="warn">${esc(f.name)} : ${e.message === 'pdf' ? 'le PDF de la politique est composé d’images et ne peut pas être lu hors ligne : charge le fichier de règles (.json) tiré de la politique.' : 'fichier de règles non reconnu (.json « travel-policy » attendu).'}</div>`; }
   renderPAIE();
 }
@@ -3732,6 +3742,8 @@ $('#pdDel').addEventListener('click', () => { const i = st.paies.findIndex(x => 
 
 
 syncBrut();
+
+applyPreset();
 /* ===================== Outil 7 : Export ===================== */
 let expMission = 'all';
 const safeName = s => String(s || '').replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '') || 'sans_nom';
