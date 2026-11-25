@@ -433,6 +433,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 .gaprep h4{margin:16px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}.gaprep h5{margin:0 0 6px;font-size:14px}.gaprep .tablebox{margin:4px 0}.gaprep table.hist{min-width:560px}
 .gapwhy{margin:0;padding-left:18px}.gapwhy li{margin:4px 0}
 .ienum{width:84px;text-align:right}
+.hscap{font-size:13px;line-height:1.5;border-top:1px solid var(--line-2);padding-top:8px;margin-top:4px}
 .pmis ul{margin:0;padding-left:18px}.pmis li{margin:2px 0}
 </style>
 
@@ -882,6 +883,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
           <div class="f"><label for="u_dept">Département</label><input id="u_dept" data-b="perso.dept"></div>
           <div class="f"><label for="u_naiss">Date de naissance</label><input type="date" id="u_naiss" data-b="perso.naiss"></div>
           <div class="f"><label for="u_regime">Régime de travail</label><select id="u_regime" data-b="perso.regime"><option value="100">Temps plein</option><option value="90">9/10e</option><option value="80">4/5e</option><option value="50">Mi-temps</option></select></div>
+          <div class="f"><label for="u_hscap">Contingent HS fiscal <span class="hint">h/an</span></label><input type="number" id="u_hscap" data-b="perso.hscap" min="0" step="1"></div>
           <div class="f"><label for="u_brut">Brut mensuel (€)</label><input type="number" step="0.01" id="u_brut" data-b="perso.brut"></div>
           <div class="f"><span class="lbl">Responsabilité par défaut (+0,10)</span><div class="seg" data-seg="perso.resp"><button type="button" data-v="1">Oui</button><button type="button" data-v="0">Non</button></div></div>
           <div class="f"><span class="lbl">Séniorité ≥ 5 ans (+0,10)</span><div class="seg" data-seg="perso.senior"><button type="button" data-v="1">Oui</button><button type="button" data-v="0">Non</button></div></div>
@@ -1339,7 +1341,7 @@ const rd = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } 
 const wr = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} };
 
 const emptyMission = () => ({nom:'', risque:false, depart:'', retour:'', pays:'', ville:'', ar800:'OUI', client:'', nature:'', ov:'', cf:'', cfLabel:'', demande:''});
-const PROFIL_DEFAULT = { perso: {...DATA.defaults.perso, resp:true, senior:true, regime:'100', naiss:''}, sign: {resp:'', dir:'', drh:'', rcm:''} };
+const PROFIL_DEFAULT = { perso: {...DATA.defaults.perso, resp:true, senior:true, regime:'100', naiss:'', hscap:'180'}, sign: {resp:'', dir:'', drh:'', rcm:''} };
 
 // reprise des anciennes versions
 const old = rd(KEY_OLD);
@@ -1626,6 +1628,10 @@ function weekendsIn(m){
   for (let x = a; x <= b; x++) { const w = isoWeekday(x); if (w >= 6) seen.add(x - (w - 6)); } // clé = samedi du week-end
   return seen.size;
 }
+const hsCap = () => { const v = num(st.perso.hscap); return v > 0 ? v : 180; };
+function hsUsedBefore(yr, dep, exceptId){ let u = 0;   // heures sup payées (après coef.) des missions de l'année antérieures à celle-ci
+  for (const [id, d] of Store.missions) if (id !== exceptId && d && d.sum && d.sum.saisi && d.sum.depart && d.sum.depart.slice(0, 4) === yr && d.sum.depart <= dep) u += hoursOf(d).paid;
+  return u; }
 function withProfile(src){
   for (const k in src.days) { const d = src.days[k]; if (d) { delete d.decal; delete d.diner; delete d.souper; } } src.params.resp = !!st.perso.resp; src.params.senior = !!st.perso.senior;
   const m = src.mission; const n = (m.depart && m.retour) ? serialOf(m.retour) - serialOf(m.depart) + 1 : 0;
@@ -1780,7 +1786,7 @@ function renderHome(){
   const recPct = Math.min(100, S.rec / 156 * 100);
   $('#stats').innerHTML = `
     <div class="kpi hero tap ${evo.metric==='j'?'on':''}" data-metric="j" role="button" tabindex="0"><div class="k">Jours de mission ${lbl}</div><div class="v">${S.j}<small>j</small></div><div class="sub">${S.n} mission${S.n>1?'s':''} comptabilisée${S.n>1?'s':''} · ${hShort(S.j7)} j d’éloignement (annexe 7)${W.n ? `<br>+ ${W.n} en attente (${W.j} j)` : ''}</div><div class="more">Voir l’évolution ›</div></div>
-    <div class="kpi hero tap ${evo.metric==='paid'?'on':''}" data-metric="paid" role="button" tabindex="0"><div class="k">Heures payées ${lbl}</div><div class="v">${h2(S.paid)}<small>h</small></div>${W.paid ? `<div class="sub">+ ${h2(W.paid)} h en attente de comptabilisation</div>` : ''}<div class="more">Voir l’évolution ›</div></div>
+    <div class="kpi hero tap ${evo.metric==='paid'?'on':''}" data-metric="paid" role="button" tabindex="0"><div class="k">Heures payées ${lbl}</div><div class="v">${h2(S.paid)}<small>h</small></div>${year !== 'all' ? (() => { const T = statsOf(list), cap = hsCap(); return `<div class="sub">contingent fiscal : ${h2(Math.min(T.paid, cap))} / ${h2(cap)} h${T.paid > cap ? ` · <b style="color:var(--bad)">${h2(T.paid - cap)} h au-delà</b>` : ''}</div>`; })() : ''}${W.paid ? `<div class="sub">+ ${h2(W.paid)} h en attente de comptabilisation</div>` : ''}<div class="more">Voir l’évolution ›</div></div>
     <div class="kpi hero tap ${evo.metric==='rec'?'on':''}" data-metric="rec" role="button" tabindex="0"><div class="k">Heures récupérées ${lbl}</div><div class="v">${h2(S.rec)}<small>h</small></div>${W.rec ? `<div class="sub">+ ${h2(W.rec)} h en attente de comptabilisation</div>` : ''}<div class="more">Voir l’évolution ›</div></div>`;
   renderEvo(okd(all));
   $('#countries').innerHTML = Object.entries(S.p).sort((a,b)=>b[1]-a[1]).map(([p,j]) => `<li>${esc(p)}<b>${j} j</b></li>`).join('');
@@ -1989,7 +1995,13 @@ function update(){
   const left = Math.max(0, 156 - used), over = part && R.ok && R.G5 > left + 1e-9;
   $('#recupHint').innerHTML = part && R.ok ? `Heures supp. max de la mission : ${h2(R.G6)} h (HS × coef.). Déjà ${h2(used)} h récupérées en ${st.mission.depart.slice(0,4)}, reste ${h2(left)} h sur 156.${over ? ` <b style="color:var(--warn)">Attention : ${h2(R.G5)} h dépassent le reste de l’année.</b>` : ''}` : '';
   const recNow = part ? R.G5 : 0, brutNow = part && R.G5 > 0 ? R.R14 : R.R9;
-  $('#payOut').innerHTML = R.ok ? `<div><div class="k">Rémunération mission brut</div><div class="v">${eur(brutNow)}</div></div><div><div class="k">Net (HS &lt; 130 h)</div><div class="v">${eur(brutNow*0.66)}</div></div><div><div class="k">Net (HS &gt; 130 h)</div><div class="v">${eur(brutNow*0.45)}</div></div><div class="k" style="grid-column:1/-1">${part ? `${h2(recNow)} h en récup, ${h2(Math.max(0,R.G6-recNow))} h payées` : `${h2(R.G6)} h payées, aucune récup`}</div>` : '';
+  { const cap = hsCap(), yr = (st.mission.depart || '').slice(0, 4), paidH = Math.max(0, R.G6 - recNow), used = R.ok ? hsUsedBefore(yr, st.mission.depart, currentId) : 0;
+    const inH = Math.max(0, Math.min(paidH, cap - used)), outH = paidH - inH, bIn = paidH ? brutNow * inH / paidH : brutNow, bOut = brutNow - bIn, net = bIn * 0.66 + bOut * 0.45;
+    $('#payOut').innerHTML = R.ok ? `<div><div class="k">Rémunération mission brut</div><div class="v">${eur(brutNow)}</div></div><div><div class="k">Net estimé</div><div class="v">${eur(net)}</div></div><div><div class="k">Contingent fiscal ${yr}</div><div class="v">${h2(Math.max(0, cap - used - inH))}<small> h restantes</small></div></div>
+      <div class="k" style="grid-column:1/-1">${part ? `${h2(recNow)} h en récup, ${h2(paidH)} h payées` : `${h2(paidH)} h payées, aucune récup`}</div>
+      <div class="hscap" style="grid-column:1/-1"><b>Heures sup avec réduction fiscale : ${h2(cap)} h max par an</b> (régime légal, CP 209). Déjà utilisées en ${yr} avant cette mission : ${h2(used)} h.<br>
+      Cette mission : <b>${h2(inH)} h</b> dans le contingent → ${eur(bIn)} × 66 % = ${eur(bIn * 0.66)}${outH > 0.005 ? `<br><span class="pneg"><b>${h2(outH)} h au-delà des ${h2(cap)} h</b> : taxation normale, sans réduction → ${eur(bOut)} × 45 % = ${eur(bOut * 0.45)}</span>` : ''}<br>
+      Net estimé = <b>${eur(net)}</b> <small class="note">(taux nets estimés : 66 % avec réduction, 45 % sans)</small></div>` : ''; }
   $('#profCoef').textContent = `profil : responsabilité ${st.perso.resp?'oui':'non'} · séniorité ${st.perso.senior?'oui':'non'}`;
   const ok = R.ok && !missionError();
   $('#rWho').textContent = `${p.prenom} ${p.nom} · ${m.ville || '—'} (${m.pays || '—'})`;
@@ -2031,7 +2043,7 @@ function update(){
     ['Temps de mission retenu <small>(min 1,50 si &gt; 800 km, plafonné à 2,00)</small>', R.G2>0?h2(R.O5) + (R.O6 > 2 ? ' <small>plafond</small>' : ''):'—'],
     ['+ Responsabilité', h2(R.O3)], ['+ Séniorité', h2(R.O4)],
     ['Coefficient final <small>(2,00 max + 0,10 + 0,10 = 2,20 max)</small>', R.G2>0?`<span class="mark">${h2(R.O7)}</span>`:'—']]);
-  $('#scen').innerHTML = `<div class="h l"></div><div class="h">Brut</div><div class="h">Net &lt;130h</div><div class="h">Net &gt;130h</div>
+  $('#scen').innerHTML = `<div class="h l"></div><div class="h">Brut</div><div class="h">Net (avec réd. fiscale)</div><div class="h">Net (au-delà de ${h2(hsCap())} h)</div>
     <div class="l">Sans récup</div><div>${eur(R.R9)}</div><div>${eur(R.S9)}</div><div>${eur(R.U9)}</div>
     <div class="l">Avec récup</div><div>${eur(R.R14)}</div><div>${eur(R.S14)}</div><div>${eur(R.U14)}</div>
     <div class="l">Mensuel total (sans récup)</div><div>${eur(R.R10)}</div><div>${eur(R.S10)}</div><div>${eur(R.U10)}</div>
@@ -3646,12 +3658,12 @@ function renderPAIED(){
       <div class="note" style="margin-top:4px">Total : <b>${eur(tot)}</b>${ms.length === 1 ? ` · attendu pour la mission : ${eur(ms[0].exp)} · HS après coef. : ${h2(ms[0].maj)} h, dont <b>${h2(ms[0].hsExp)} h payées</b> et <b>${h2(ms[0].rec)} h à récupérer</b>` : ''}</div></div>`; }).join('')
     || `<p class="note" style="margin:0">Aucune ligne « Mission » ou « Heures sup. » sur cette fiche. Si une ligne en est une, change sa catégorie plus bas.</p>`;
   if (c.hsCom) $('#pdMis').innerHTML += `<p class="note" style="margin:6px 0 0">Communication de la fiche : ${p.comm.filter(L => /\bhs\b|suppl/.test(normTxt(L.label)) && L.h).map(L => `${esc(L.label)} ${moisLbl(L.per)} : ${h2(L.h)} h`).join(' · ')}.</p>`;
-  const yr = p.mois.slice(0, 4), hsY = misList().filter(m => m.depart.startsWith(yr)).reduce((s, m) => s + m.hsExp, 0), appNet = hsY > 130 ? 0.45 : 0.66;
+  const yr = p.mois.slice(0, 4), hsY = misList().filter(m => m.depart.startsWith(yr)).reduce((s, m) => s + m.hsExp, 0), appNet = hsY > hsCap() ? 0.45 : 0.66;
   const rows = [['Taux de précompte du mois <small>précompte / imposable</small>', pct(c.tx)], ['Cotisation ONSS <small>/ brut</small>', pct(c.txOnss)], ['Net / brut', pct(c.brut ? c.net / c.brut : NaN)]];
   if (R) { rows.push([`Fiche de référence <small>moyenne de ${R.n} fiche${R.n > 1 ? 's' : ''} sans mission</small>`, `${eur(R.brut)} brut · ${eur(R.net)} net`], ['Taux de précompte de référence', pct(R.imp ? R.prec / R.imp : NaN)]);
     const dB = c.brut - R.brut, dI = c.imp - R.imp, dP = c.prec - R.prec, dN = c.net - R.net;
     if (c.misMt && dB > 20) rows.push(['Brut en plus vs référence', sgn(dB, false)], ['Impôt sur ce supplément <small>Δ précompte / Δ imposable</small>', `<span class="mark">${pct(dI > 0 ? dP / dI : NaN)}</span>`],
-      ['Net gardé sur ce supplément <small>Δ net / Δ brut</small>', `<span class="mark">${pct(dN / dB)}</span>`], [`Hypothèse de l’app <small>HS ${yr} : ${h2(hsY)} h ${hsY > 130 ? '&gt;' : '≤'} 130 h</small>`, pct(appNet)],
+      ['Net gardé sur ce supplément <small>Δ net / Δ brut</small>', `<span class="mark">${pct(dN / dB)}</span>`], [`Hypothèse de l’app <small>HS ${yr} : ${h2(hsY)} h ${hsY > hsCap() ? '&gt;' : '≤'} ${h2(hsCap())} h</small>`, pct(appNet)],
       ['Écart réel − hypothèse', sgn((dN / dB - appNet) * dB, true) + ` <small class="note">(${pct(dN / dB - appNet)})</small>`]); }
     $('#pdTax').innerHTML = `<dl>${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>` + (R ? '' : '<p class="note" style="margin:10px 0 0">Importe aussi une fiche d’un mois sans mission : l’app calculera alors l’impôt réellement prélevé sur la part mission / HS et l’écart avec l’hypothèse de l’app (66 % ou 45 % de net).</p>');
   { const b = baremeOf(p); $('#pdBar').innerHTML = b.err ? `<p class="note" style="margin:0">${esc(b.err)} Renseigne ta position dans « Barème salarial » (Mes fiches).</p>`
