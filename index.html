@@ -2321,7 +2321,8 @@ async function pdfRaster(buf, dpi = 200){
       else if (op === 'Do' && xo) { try { await drawXObj(ctx, xo.lookup(N(lastName)), ctm, s, H); } catch(e) {} }
       nums.length = 0;
     }
-    out.push(cv);
+    const rot = ((pg.getRotation().angle || 0) % 360 + 360) % 360;    // page marquée « tournée » dans le PDF
+    out.push(rot ? rotCanvas(cv, rot) : cv);
   }
   return out;
 }
@@ -2359,12 +2360,16 @@ function rotCanvas(cv, deg){ const r = document.createElement('canvas'), q = deg
   const x = r.getContext('2d'); x.translate(r.width / 2, r.height / 2); x.rotate(deg * Math.PI / 180); x.drawImage(cv, -cv.width / 2, -cv.height / 2); return r; }
 const ocrScore = t => (t.match(/[A-Za-zÀ-ÿ]{3,}/g) || []).length;
 /* OCR d'une page avec détection d'orientation (0 / 90 / 270°) */
-async function ocrPage(cv, want){
-  let best = null;
-  for (const deg of [0, 90, 270]) { const c = deg ? rotCanvas(cv, deg) : cv, r = await ocrCanvas(c); r.cv = c; r.score = ocrScore(r.text) + (want && want.test(r.text) ? 100 : 0);
-    if (!best || r.score > best.score) best = r; if (best.score > 100 || (deg === 0 && r.score > 60)) break; }
-  return best;
+function scaleCanvas(cv, f){ const c = document.createElement('canvas'); c.width = Math.round(cv.width * f); c.height = Math.round(cv.height * f); const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.drawImage(cv, 0, 0, c.width, c.height); return c; }
+/* OCR d'une page avec détection automatique de l'orientation (portrait, paysage, tête-bêche) :
+   essai rapide des 4 sens sur une image réduite, puis lecture complète dans le bon sens */
+async function orientRank(cv, want){   // classement des 4 sens : nombre de mots lus + confiance (sur image réduite, rapide)
+  const small = scaleCanvas(cv, 0.5), L = [];
+  for (const deg of [0, 90, 180, 270]) { const r = await ocrCanvas(deg ? rotCanvas(small, deg) : small, { words: false }); L.push({ deg, sc: ocrScore(r.text) + r.conf * 0.5 + (want && want.test(r.text) ? 40 : 0) }); }
+  return L.sort((a, b) => b.sc - a.sc).map(x => x.deg);
 }
+async function ocrAt(cv, deg, want){ const c = deg ? rotCanvas(cv, deg) : cv, r = await ocrCanvas(c); r.cv = c; r.deg = deg; r.score = ocrScore(r.text) + (want && want.test(r.text) ? 100 : 0); return r; }
+async function ocrPage(cv, want){ const order = await orientRank(cv, want), r = await ocrAt(cv, order[0], want); r.order = order; r.src = cv; return r; }
 /* lecture des formulaires FN : annexe 6A (récapitulatif) et relevé d'heures */
 const ocrNum = s => { const v = parseFloat(String(s).replace(',', '.').replace(/[^\d.]/g, '')); return isFinite(v) ? v : null; };
 function parse6A(r){
@@ -2490,16 +2495,24 @@ async function parseReleveGrid(r, year){
     if (Math.abs(s - T) > 0.01) { if (days.length === 1) out[days[0]][k] = T; else out.__warn = true; } }
   return out;
 }
-window.__ocr = { gridLines: (c, a, f) => gridLines(c, a, f), parseReleveGrid: (r, y) => parseReleveGrid(r, y), ocrCanvas: (c, o) => ocrCanvas(c, o), tessReady: () => tessReady(), pdfRaster: (b, d) => pdfRaster(b, d), ocrPage: (c, w) => ocrPage(c, w), parse6A: r => parse6A(r), parseRecup: r => parseRecup(r), run: (b) => ocrMissionPdf(b) };   // accès pour les tests
+window.__ocr = { gridLines: (c, a, f) => gridLines(c, a, f), parseReleveGrid: (r, y) => parseReleveGrid(r, y), ocrCanvas: (c, o) => ocrCanvas(c, o), tessReady: () => tessReady(), pdfRaster: (b, d) => pdfRaster(b, d), ocrPage: (c, w) => ocrPage(c, w), parse6A: r => parse6A(r), parseRecup: r => parseRecup(r), run: (b) => ocrMissionPdf(b), runPages: (p) => ocrMissionPages(p), rot: (c, d) => rotCanvas(c, d) };   // accès pour les tests
 async function ocrMissionPdf(buf, onStep){
   onStep && onStep('Chargement du moteur de lecture…'); await tessReady();
-  onStep && onStep('Rendu des pages…'); const pages = await pdfRaster(buf, 200); const res = { days: {} }; let year = null;
+  onStep && onStep('Rendu des pages…'); return ocrMissionPages(await pdfRaster(buf, 200), onStep);
+}
+async function ocrMissionPages(pages, onStep){
+  const res = { days: {}, rot: [] }; let year = null; const later = [];
   for (let i = 0; i < pages.length; i++) {
     onStep && onStep(`Lecture de la page ${i + 1}/${pages.length}…`);
-    const r = await ocrPage(pages[i], /ANNEXE\s*6A|RELEVE|RELEV[ÉE]/i);
-    if (/ANNEXE\s*6A|RECAPITULATIF/i.test(r.text)) { Object.assign(res, parse6A(r)); const rc = await parseRecup(r); if (rc != null) res.recup = rc; if (res.depart) year = +res.depart.slice(0, 4); }
-    else if (/RELEV/i.test(r.text) && /Lu|Ma/.test(r.text)) { const y = year || (r.text.match(/(20\d{2})/) || [])[1]; const d = await parseReleveGrid(r, +y || new Date().getFullYear()); if (d) Object.assign(res.days, d); }
+    let r = await ocrPage(pages[i], /ANNEXE\s*6A|RELEVE|RELEV[ÉE]/i); res.rot.push(r.deg);
+    if (/ANNEXE\s*6A|RECAPITULATIF/i.test(r.text)) { let rc = await parseRecup(r);
+      if (rc == null) { const r2 = await ocrAt(r.src, r.order[1]); const rc2 = await parseRecup(r2); if (rc2 != null && parse6A(r2).depart) { r = r2; rc = rc2; res.rot[i] = r2.deg; } }   // 2e sens si le cadre n'est pas trouvé
+      Object.assign(res, parse6A(r)); if (rc != null) res.recup = rc; if (res.depart) year = +res.depart.slice(0, 4); }
+    else if (/RELEV/i.test(r.text) && /Lu|Ma/.test(r.text)) later.push(r);      // relevé lu après l'annexe 6A (année de la mission)
   }
+  for (let r of later) { const y = +((year || (r.text.match(/(20\d{2})/) || [])[1])) || new Date().getFullYear(); let d = await parseReleveGrid(r, y);
+    if (!d || !Object.keys(d).length) { const r2 = await ocrAt(r.src, r.order[1]); const d2 = await parseReleveGrid(r2, y); if (d2 && Object.keys(d2).length) d = d2; }   // 2e sens si le tableau n'est pas reconnu
+    if (d) Object.assign(res.days, d); }
   return res;
 }
 
