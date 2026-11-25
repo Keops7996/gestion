@@ -739,9 +739,9 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
     </section>
     <section class="card">
       <h2>Écarts missions encodées ↔ fiches de paie <span class="tag" id="paieGapN"></span></h2>
-      <div class="body"><p class="note" style="margin-top:0">Heures sup = heures après coefficient, réparties entre récupération et paiement selon ton encodage. Attendu = rémunération mission brut calculée dans Heures Mission. Payé = lignes « Mission » et « Heures sup. » des fiches dont la période tombe pendant la mission (réparti au prorata si plusieurs missions le même mois). Les fiches doivent contenir au moins les heures sup de la mission ; un surplus est compté comme heures sup régulières (hors mission). <b>Clique sur une mission pour l’analyse détaillée.</b></p></div>
+      <div class="body"><p class="note" style="margin-top:0">Heures sup après coefficient réparties entre récupération et paiement ; sur la fiche, seules les heures au-delà de l’horaire normal FN sont payées en heures sup (au prorata de la part payée). Attendu = rémunération mission brut calculée dans Heures Mission. Payé = lignes « Mission » et « Heures sup. » des fiches dont la période tombe pendant la mission (réparti au prorata si plusieurs missions le même mois). Les fiches doivent contenir au moins les heures sup de la mission ; un surplus est compté comme heures sup régulières (hors mission). <b>Clique sur une mission pour l’analyse détaillée.</b></p></div>
       <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
-        <thead><tr><th>Mission</th><th class="num">H. sup (× coef.)</th><th class="num">À récupérer</th><th class="num">Payées</th><th class="num">Payées sur fiche</th><th class="num">Attendu brut</th><th class="num">Payé brut</th><th class="num">Écart</th><th>Statut</th></tr></thead>
+        <thead><tr><th>Mission</th><th class="num">H. sup (× coef.)</th><th class="num">À récupérer</th><th class="num">Payées (× coef.)</th><th class="num">Attendues sur fiche</th><th class="num">Sur fiche</th><th class="num">Attendu brut</th><th class="num">Payé brut</th><th class="num">Écart</th><th>Statut</th></tr></thead>
         <tbody id="paieGap"></tbody></table></div>
       <div class="body" id="paieOrph"></div>
     </section>
@@ -1687,8 +1687,8 @@ function weekendsIn(m){
   return seen.size;
 }
 const hsCap = () => { const v = num(st.perso.hscap); return v > 0 ? v : 180; };
-function hsUsedBefore(yr, dep, exceptId){ let u = 0;   // heures sup payées (après coef.) des missions de l'année antérieures à celle-ci
-  for (const [id, d] of Store.missions) if (id !== exceptId && d && d.sum && d.sum.saisi && d.sum.depart && d.sum.depart.slice(0, 4) === yr && d.sum.depart <= dep) u += hoursOf(d).paid;
+function hsUsedBefore(yr, dep, exceptId){ let u = 0;   // heures sup payées (prestées − horaire FN) des missions de l'année antérieures à celle-ci
+  for (const [id, d] of Store.missions) if (id !== exceptId && d && d.sum && d.sum.saisi && d.sum.depart && d.sum.depart.slice(0, 4) === yr && d.sum.depart <= dep) u += hoursOf(d).raw;
   return u; }
 function withProfile(src){
   for (const k in src.days) { const d = src.days[k]; if (d) { delete d.decal; delete d.diner; delete d.souper; } } src.params.resp = !!st.perso.resp; src.params.senior = !!st.perso.senior;
@@ -1845,7 +1845,7 @@ function renderHome(){
   const recPct = Math.min(100, S.rec / 156 * 100);
   $('#stats').innerHTML = `
     <div class="kpi hero tap ${evo.metric==='j'?'on':''}" data-metric="j" role="button" tabindex="0"><div class="k">Jours de mission ${lbl}</div><div class="v">${S.j}<small>j</small></div><div class="sub">${S.n} mission${S.n>1?'s':''} comptabilisée${S.n>1?'s':''} · ${hShort(S.j7)} j d’éloignement (annexe 7)${W.n ? `<br>+ ${W.n} en attente (${W.j} j)` : ''}</div><div class="more">Voir l’évolution ›</div></div>
-    <div class="kpi hero tap ${evo.metric==='paid'?'on':''}" data-metric="paid" role="button" tabindex="0"><div class="k">Heures payées ${lbl}</div><div class="v">${h2(S.paid)}<small>h</small></div>${year !== 'all' ? (() => { const T = statsOf(list), cap = hsCap(); return `<div class="sub">contingent fiscal : ${h2(Math.min(T.paid, cap))} / ${h2(cap)} h${T.paid > cap ? ` · <b style="color:var(--bad)">${h2(T.paid - cap)} h au-delà</b>` : ''}</div>`; })() : ''}${W.paid ? `<div class="sub">+ ${h2(W.paid)} h en attente de comptabilisation</div>` : ''}<div class="more">Voir l’évolution ›</div></div>
+    <div class="kpi hero tap ${evo.metric==='paid'?'on':''}" data-metric="paid" role="button" tabindex="0"><div class="k">Heures payées ${lbl}</div><div class="v">${h2(S.paid)}<small>h</small></div>${year !== 'all' ? (() => { const raw = list.reduce((s, [, d]) => s + (d.sum && d.sum.saisi ? hoursOf(d).raw : 0), 0), cap = hsCap(); return `<div class="sub">contingent fiscal (h sup sur fiche) : ${h2(Math.min(raw, cap))} / ${h2(cap)} h${raw > cap ? ` · <b style="color:var(--bad)">${h2(raw - cap)} h au-delà</b>` : ''}</div>`; })() : ''}${W.paid ? `<div class="sub">+ ${h2(W.paid)} h en attente de comptabilisation</div>` : ''}<div class="more">Voir l’évolution ›</div></div>
     <div class="kpi hero tap ${evo.metric==='rec'?'on':''}" data-metric="rec" role="button" tabindex="0"><div class="k">Heures récupérées ${lbl}</div><div class="v">${h2(S.rec)}<small>h</small></div>${W.rec ? `<div class="sub">+ ${h2(W.rec)} h en attente de comptabilisation</div>` : ''}<div class="more">Voir l’évolution ›</div></div>`;
   renderEvo(okd(all));
   $('#countries').innerHTML = Object.entries(S.p).sort((a,b)=>b[1]-a[1]).map(([p,j]) => `<li>${esc(p)}<b>${j} j</b></li>`).join('');
@@ -1968,7 +1968,9 @@ $('#histBody').addEventListener('change', e => {
   if (id === currentId) currentMeta[inp.dataset.f] = inp.value;
   Store.save(id, doc);
 });
-function hoursOf(d){ const x = d.sum, part = d.params && d.params.paiement === 'partiel'; const maj = (x.hs || 0) * (x.coef || 0); const rec = part ? (x.recup || 0) : 0; return {rec, paid: Math.max(0, maj - rec)}; }
+function hoursOf(d){ const x = d.sum, part = d.params && d.params.paiement === 'partiel'; const maj = (x.hs || 0) * (x.coef || 0); const rec = part ? (x.recup || 0) : 0, paid = Math.max(0, maj - rec);
+  // raw = heures payées en heures sup sur la fiche : heures prestées − horaire normal FN, au prorata de la part payée (hors récup)
+  return { rec, paid, maj, raw: maj > 0 ? (x.hs || 0) * paid / maj : 0 }; }
 
 /* ---- tableau des jours ---- */
 function dayList(){
@@ -2054,10 +2056,10 @@ function update(){
   const left = Math.max(0, 156 - used), over = part && R.ok && R.G5 > left + 1e-9;
   $('#recupHint').innerHTML = part && R.ok ? `Heures supp. max de la mission : ${h2(R.G6)} h (HS × coef.). Déjà ${h2(used)} h récupérées en ${st.mission.depart.slice(0,4)}, reste ${h2(left)} h sur 156.${over ? ` <b style="color:var(--warn)">Attention : ${h2(R.G5)} h dépassent le reste de l’année.</b>` : ''}` : '';
   const recNow = part ? R.G5 : 0, brutNow = part && R.G5 > 0 ? R.R14 : R.R9;
-  { const cap = hsCap(), yr = (st.mission.depart || '').slice(0, 4), paidH = Math.max(0, R.G6 - recNow), used = R.ok ? hsUsedBefore(yr, st.mission.depart, currentId) : 0;
-    const inH = Math.max(0, Math.min(paidH, cap - used)), outH = paidH - inH, bIn = paidH ? brutNow * inH / paidH : brutNow, bOut = brutNow - bIn, net = bIn * 0.66 + bOut * 0.45;
+  { const cap = hsCap(), yr = (st.mission.depart || '').slice(0, 4), paidH = Math.max(0, R.G6 - recNow), rawH = R.G6 > 0 ? R.G4 * paidH / R.G6 : 0, used = R.ok ? hsUsedBefore(yr, st.mission.depart, currentId) : 0;
+    const inH = Math.max(0, Math.min(rawH, cap - used)), outH = rawH - inH, bIn = rawH ? brutNow * inH / rawH : brutNow, bOut = brutNow - bIn, net = bIn * 0.66 + bOut * 0.45;
     $('#payOut').innerHTML = R.ok ? `<div><div class="k">Rémunération mission brut</div><div class="v">${eur(brutNow)}</div></div><div><div class="k">Net estimé</div><div class="v">${eur(net)}</div></div><div><div class="k">Contingent fiscal ${yr}</div><div class="v">${h2(Math.max(0, cap - used - inH))}<small> h restantes</small></div></div>
-      <div class="k" style="grid-column:1/-1">${part ? `${h2(recNow)} h en récup, ${h2(paidH)} h payées` : `${h2(paidH)} h payées, aucune récup`}</div>
+      <div class="k" style="grid-column:1/-1">${part ? `${h2(recNow)} h en récup, ${h2(paidH)} h payées (après coef.)` : `${h2(paidH)} h payées (après coef.), aucune récup`} · <b>${h2(rawH)} h sup sur la fiche</b> <small>(prestées − horaire FN${part ? ', part payée' : ''})</small></div>${(() => { const HP = st.cfg && st.cfg.policy && st.cfg.policy.hs; return HP ? `<div class="hscap" style="grid-column:1/-1">${HP.ref ? `<span class="ref" style="margin:0 6px 0 0">${esc(HP.ref)}</span>` : ''}<b>${esc(HP.formule || '')}</b> = 1 + (${h2(R.G3)} − ${h2(R.G2)}) / ${h2(R.G2)}${R.G2 ? ` = ${h2(1 + (R.G3 - R.G2) / R.G2)}` : ''} → coefficient total ${h2(R.O7)}. Heures sup A − B = ${h2(R.G4)} h${part ? ` ; part payée : ${h2(R.G4)} × ${h2(paidH)} / ${h2(R.G6)} = ${h2(rawH)} h` : ''}.</div>` : ''; })()}
       <div class="hscap" style="grid-column:1/-1"><b>Heures sup avec réduction fiscale : ${h2(cap)} h max par an</b> (régime légal, CP 209). Déjà utilisées en ${yr} avant cette mission : ${h2(used)} h.<br>
       Cette mission : <b>${h2(inH)} h</b> dans le contingent → ${eur(bIn)} × 66 % = ${eur(bIn * 0.66)}${outH > 0.005 ? `<br><span class="pneg"><b>${h2(outH)} h au-delà des ${h2(cap)} h</b> : taxation normale, sans réduction → ${eur(bOut)} × 45 % = ${eur(bOut * 0.45)}</span>` : ''}<br>
       Net estimé = <b>${eur(net)}</b> <small class="note">(taux nets estimés : 66 % avec réduction, 45 % sans)</small></div>` : ''; }
@@ -3729,7 +3731,7 @@ function misList(){
   const out = [];
   for (const [id, d] of Store.missions) { if (!d || !d.sum || !d.sum.depart) continue; const x = d.sum, ret = x.retour || x.depart;
     const months = {}; let n = 0; for (let t = new Date(x.depart + 'T12:00'); t <= new Date(ret + 'T12:00'); t.setDate(t.getDate() + 1)) { const k = t.toISOString().slice(0, 7); months[k] = (months[k] || 0) + 1; n++; }
-    out.push({ id, d, name: (d.mission && d.mission.nom) || x.ville || x.pays || 'Mission', depart: x.depart, retour: ret, months, n: n || 1, exp: x.brut || 0, hsExp: hoursOf(d).paid, rec: hoursOf(d).rec, maj: hoursOf(d).paid + hoursOf(d).rec }); }
+    out.push({ id, d, name: (d.mission && d.mission.nom) || x.ville || x.pays || 'Mission', depart: x.depart, retour: ret, months, n: n || 1, exp: x.brut || 0, hsExp: hoursOf(d).raw, paidC: hoursOf(d).paid, rec: hoursOf(d).rec, maj: hoursOf(d).maj }); }
   return out.sort((a, b) => b.depart.localeCompare(a.depart));
 }
 function gapCalc(){
@@ -3763,10 +3765,15 @@ function gapReport(m){
   const x = m.d.sum, part = m.d.params && m.d.params.paiement === 'partiel', raw = x.hs || 0, coef = x.coef || 0, near = (a, b) => Math.abs(a - b) <= 0.25;
   const dl = rows => `<dl>${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
   let h = `<div class="gaprep rows">`;
-  h += `<h4>1 · Ce que tu as encodé dans Heures Mission</h4>` + dl([
+  const HP = st.cfg && st.cfg.policy && st.cfg.policy.hs;
+  h += `<h4>1 · Ce que tu as encodé dans Heures Mission${HP && HP.ref ? ` <span class="ref">${esc(HP.ref)}</span>` : ''}</h4>`;
+  if (HP) h += `<p class="note" style="margin:0 0 6px"><b>${esc(HP.formule || '')}</b>${HP.A ? ` — A : ${esc(HP.A)}` : ''}${HP.B ? ` ; B : ${esc(HP.B)}` : ''}. ${esc(HP.regle || '')}${part && HP.recup ? ' ' + esc(HP.recup) : ''}</p>`;
+  h += dl([
     ['Période', `${dFr(m.depart)} → ${dFr(m.retour)} · ${m.n} j (${Object.entries(m.months).sort().map(([k, n]) => `${moisLbl(k)} : ${n} j`).join(', ')})`],
-    ['Heures sup brutes', h2(raw) + ' h'], ['Coefficient', coef ? h2(coef) : '—'], ['Heures sup après coefficient <small>brutes × coef.</small>', `<b>${h2(m.maj)} h</b>`],
-    ['Paiement', part ? 'partiel (une partie en récupération)' : 'intégral'], ['→ à récupérer', h2(m.rec) + ' h'], ['→ à payer <small>après coef. − récup</small>', `<b>${h2(m.hsExp)} h</b>`],
+    ['Heures prestées (A)', x.prestees != null ? h2(x.prestees) + ' h' : '—'], ['Horaire normal FN (B)', x.fn != null ? h2(x.fn) + ' h' : '—'],
+    ['Heures sup <small>A − B</small>', h2(raw) + ' h'], ['Coefficient', coef ? h2(coef) + (x.fn ? ` <small class="note">(1 + (${h2(x.prestees)} − ${h2(x.fn)}) / ${h2(x.fn)} = ${h2(1 + (x.prestees - x.fn) / x.fn)} + resp./séniorité)</small>` : '') : '—'], ['Heures sup après coefficient <small>brutes × coef.</small>', `<b>${h2(m.maj)} h</b>`],
+    ['Paiement', part ? 'partiel (une partie en récupération)' : 'intégral'], ['→ à récupérer', h2(m.rec) + ' h'], ['→ payées <small>après coef. − récup</small>', `${h2(m.paidC)} h`],
+    [`→ <b>heures sup attendues sur la fiche</b> <small>prestées − horaire FN${part ? ', au prorata de la part payée' : ''}</small>`, `<b>${h2(m.hsExp)} h</b>${part && m.maj ? ` <small class="note">(${h2(raw)} × ${h2(m.paidC)} / ${h2(m.maj)})</small>` : ''}`],
     ['Rémunération mission brut attendue', `<b>${eur(m.exp)}</b>`]]);
   h += `<h4>2 · Ce que disent les fiches de paie</h4><p class="note">L’app cherche, sur toutes les fiches importées, les lignes « Mission » et « Heures sup. » dont la <b>période</b> tombe pendant la mission, plus les heures sup de la partie « Communication ».</p>`;
   for (const P of m.per) {
@@ -3778,7 +3785,7 @@ function gapReport(m){
     h += `.</p></div>`; }
   h += `<h4>3 · Le calcul</h4>` + dl([
     ['Heures sup payées sur les fiches', `${m.per.map(P => h2(P.paidH * P.hshare)).join(' + ')} = <b>${h2(m.paidH)} h</b>`],
-    ['Heures sup à payer encodées', `<b>${h2(m.hsExp)} h</b>`],
+    ['Heures sup attendues <small>prestées − horaire FN, part payée</small>', `<b>${h2(m.hsExp)} h</b>`],
     ['Règle <small>fiches ≥ mission</small>', m.dH > 0.25 ? `<span class="pneg">non respectée : ${h2(m.dH)} h de mission manquantes</span>` : `<span class="ppos">respectée</span>`],
     ...(m.reg ? [['Surplus → heures sup régulières (hors mission) <small>fiches − mission</small>', `<span class="mark">${h2(m.reg)} h</span>`]] : []),
     ['Payé brut sur les fiches', `${m.per.map(P => eur(P.paid * P.share)).join(' + ')} = <b>${eur(m.paid)}</b>`],
@@ -3790,10 +3797,10 @@ function gapReport(m){
     if (Math.abs(m.dH) > 0.25) {
       if (m.dH < 0) { why.push(`Les fiches montrent ${h2(-m.dH)} h de plus que les ${h2(m.hsExp)} h de mission à payer : toutes les heures de mission sont retrouvées, le surplus est compté comme <b>heures sup régulières</b> (prestées hors mission le même mois). Ce n’est pas une anomalie.`);
         if (m.gap > m.tol) why.push(`Le brut payé en plus (${eur(m.gap)}) peut correspondre au paiement de ces ${h2(m.reg)} h régulières s’il est sur la même ligne que la mission.`);
-        if (m.rec && near(m.paidH, m.maj)) why.push(`${h2(m.paidH)} h = toutes tes heures après coefficient (${h2(m.maj)} h), récup comprise : la fiche compte sans doute aussi les ${h2(m.rec)} h mises en récupération.`); }
+        if (near(m.paidH, m.paidC)) why.push(`${h2(m.paidH)} h = tes heures payées après coefficient (${h2(m.paidC)} h) : la fiche compte les heures × coefficient, pas seulement les heures au-delà de l’horaire FN.`);
+        else if (m.rec && near(m.paidH, raw)) why.push(`${h2(m.paidH)} h = toutes tes heures au-delà de l’horaire FN (${h2(raw)} h) : la fiche paie aussi la part mise en récupération.`); }
       else { why.push(`<b>Anomalie :</b> les fiches doivent contenir au minimum les ${h2(m.hsExp)} h sup de la mission, or il en manque ${h2(m.dH)} h.`);
-        if (raw && near(m.paidH, raw * (m.hsExp / (m.maj || 1)))) why.push(`${h2(m.paidH)} h correspond à tes heures <b>avant coefficient</b> : la fiche compte les heures réelles, l’app les heures × ${h2(coef)}.`);
-        else if (raw && near(m.paidH, raw)) why.push(`${h2(m.paidH)} h = tes heures sup brutes (${h2(raw)} h, sans coefficient) : la fiche compte les heures réelles, pas les heures × coefficient.`); }
+      }
       if (m.per.some(P => P.src.some(o => o.kind === 'comm' && o.countH))) why.push('Les heures viennent surtout de la ligne « HS avec réduction fiscale » de la communication : elle ne reprend que les heures qui ont droit à la réduction fiscale (contingent limité), pas forcément toutes les heures payées.');
       if (m.dH > 0 && Math.abs(m.gap) <= m.tol) why.push('Les euros concordent pourtant : vérifie si la fiche compte les heures autrement (sans coefficient, ou seulement celles avec réduction fiscale) avant de réclamer.'); }
     if (m.per.some(P => !P.src.length)) why.push('Une partie de la mission n’a aucune ligne sur les fiches : vérifie que toutes les fiches concernées sont importées.');
@@ -4008,7 +4015,7 @@ $('#ieBody').addEventListener('change', e => { const el = e.target.closest('[dat
   P[y] = { ...(P[y] || {}), [el.dataset.iek]: el.value }; Store.saveProfil(); setTimeout(() => { renderIE(); autoLabel($('#ieCard')); }, 0); });
 /* --- politique interne (fichier de règles chargé par l'utilisateur, gardé dans la db) --- */
 function applyPolicy(J, fname){
-  st.cfg = st.cfg || {}; st.cfg.policy = { name: J.name || 'Politique interne', version: J.version || '', rules: J.rules || [], ie: J.ie || null, fichier: fname, loaded: new Date().toISOString() };
+  st.cfg = st.cfg || {}; st.cfg.policy = { name: J.name || 'Politique interne', version: J.version || '', rules: J.rules || [], ie: J.ie || null, hs: J.hs || null, fichier: fname, loaded: new Date().toISOString() };
   let n = 0; const c = st.cfg; if (Array.isArray(J.items) && Array.isArray(c.items)) { const have = new Set(c.items.map(it => normTxt(it.text)));
     for (const x of J.items) { const text = String(x.text || '').trim(), cat = String(x.cat || 'Administratif').trim(); if (!text || have.has(normTxt(text))) continue;
       if (!c.cats.includes(cat)) c.cats.splice(Math.max(0, c.cats.indexOf('Retour')) || c.cats.length, 0, cat);
@@ -4055,8 +4062,8 @@ function renderPAIE(){
     || `<tr><td colspan="7" class="note" style="padding:16px">Aucune fiche pour l’instant : importe un PDF ci-dessus.</td></tr>`;
   const G = gapCalc(), M = G.M.filter(m => paieYear === 'all' || m.depart.startsWith(paieYear) || m.retour.startsWith(paieYear));
   const nko = M.filter(m => m.st[0] !== 'ok').length; $('#paieGapN').textContent = M.length ? (nko ? `${nko} à vérifier` : 'tout est OK') : '';
-  $('#paieGap').innerHTML = M.map(m => `<tr data-gid="${esc(m.id)}" class="gaprow${gapOpen.has(m.id) ? ' open' : ''}" title="Cliquer pour l’analyse détaillée"><td><b>${esc(m.name)}</b><span class="sub">${dFr(m.depart)} → ${dFr(m.retour)}</span></td><td class="num">${h2(m.maj)} h</td><td class="num">${h2(m.rec)} h</td><td class="num"><b>${h2(m.hsExp)} h</b></td><td class="num">${m.seen ? h2(m.paidH) + ' h' : '—'}</td><td class="num">${eur(m.exp)}</td><td class="num">${m.seen ? eur(m.paid) : '—'}</td><td class="num">${m.seen ? sgn(m.gap) : '—'}</td><td><span class="pst ${m.st[0]}">${m.st[1]}</span> <span class="gapchev" aria-hidden="true">${gapOpen.has(m.id) ? '▴' : '▾'}</span></td></tr>${gapOpen.has(m.id) ? `<tr class="gapdet"><td colspan="9">${gapReport(m)}</td></tr>` : ''}`).join('')
-    || `<tr><td colspan="9" class="note" style="padding:16px">Aucune mission encodée dans Heures Mission${paieYear !== 'all' ? ' pour ' + paieYear : ''}.</td></tr>`;
+  $('#paieGap').innerHTML = M.map(m => `<tr data-gid="${esc(m.id)}" class="gaprow${gapOpen.has(m.id) ? ' open' : ''}" title="Cliquer pour l’analyse détaillée"><td><b>${esc(m.name)}</b><span class="sub">${dFr(m.depart)} → ${dFr(m.retour)}</span></td><td class="num">${h2(m.maj)} h</td><td class="num">${h2(m.rec)} h</td><td class="num">${h2(m.paidC)} h</td><td class="num"><b>${h2(m.hsExp)} h</b></td><td class="num">${m.seen ? h2(m.paidH) + ' h' : '—'}</td><td class="num">${eur(m.exp)}</td><td class="num">${m.seen ? eur(m.paid) : '—'}</td><td class="num">${m.seen ? sgn(m.gap) : '—'}</td><td><span class="pst ${m.st[0]}">${m.st[1]}</span> <span class="gapchev" aria-hidden="true">${gapOpen.has(m.id) ? '▴' : '▾'}</span></td></tr>${gapOpen.has(m.id) ? `<tr class="gapdet"><td colspan="10">${gapReport(m)}</td></tr>` : ''}`).join('')
+    || `<tr><td colspan="10" class="note" style="padding:16px">Aucune mission encodée dans Heures Mission${paieYear !== 'all' ? ' pour ' + paieYear : ''}.</td></tr>`;
   $('#paieOrph').innerHTML = G.orph.length ? `<div class="warn"><b>Lignes mission / HS sans mission encodée :</b> ${G.orph.map(o => `${moisLbl(o.k)} (${eur(o.mt)})`).join(', ')}. Encode la mission dans Heures Mission, ou change la catégorie de la ligne si ce n’est pas une mission.</div>` : '';
   $('#paieOrph').hidden = !G.orph.length;
   renderGrille(L);
