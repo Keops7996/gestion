@@ -2557,10 +2557,16 @@ async function pdfNext(){
       if (o.depart) { $('#pi_dep').value = o.depart; filled.push('départ'); } if (o.retour) { $('#pi_ret').value = o.retour; filled.push('retour'); }
       if (o.nature) { fill('#pi_nature', o.nature); filled.push('nature'); } if (o.cf) { fill('#pi_cf', o.cf); filled.push('CF'); } if (o.demande) { fill('#pi_dem', o.demande); filled.push('demandeur'); }
       if (o.ar800) $('#pi_ar').value = o.ar800; if (o.recup != null) { $('#pi_recup').value = o.recup; filled.push('récup'); }
+      // concordance des dates : si le relevé ne tombe pas dans la période de la mission, le premier jour pointé = premier jour de mission
+      let shifted = false; { const D = o.days || {}; delete D.__warn; const keys = Object.keys(D).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k) && Object.values(D[k]).some(Boolean)).sort();
+        const dep = $('#pi_dep').value, ret = $('#pi_ret').value || dep;
+        if (keys.length && !dep) { $('#pi_dep').value = keys[0]; $('#pi_ret').value = keys[keys.length - 1]; }
+        else if (keys.length && (keys[0] < dep || keys[keys.length - 1] > ret)) { const off = serialOf(dep) - serialOf(keys[0]), N = {};
+          for (const k of keys) N[isoOf(serialOf(k) + off)] = D[k]; o.days = N; shifted = off !== 0; } }
       pdfDays(); let nd = 0; for (const [d, v] of Object.entries(o.days || {})) for (const k of ['t', 'd', 'a']) { const el = $(`#pi_days [data-pd="${d}"][data-k="${k}"]`); if (el && v[k]) { el.value = v[k]; nd++; } }
       pdfTot(); const tot = Object.values(o.days || {}).reduce((s, v) => s + (v.t || 0) + (v.d || 0) + (v.a || 0), 0);
       msg.className = filled.length ? 'note okline' : 'warn';
-      msg.innerHTML = filled.length ? `<b>Lu automatiquement</b> : ${filled.join(', ')}${nd ? `, relevé d’heures (${h2(tot)} h)` : ''}.${o.A ? ` Annexe 6A : A = ${h2(o.A)} h${nd && Math.abs(o.A - tot) > 0.01 ? ` <b class="pneg">≠ ${h2(tot)} h lues dans le relevé : vérifie les heures</b>` : nd ? ' ✓ concorde avec le relevé' : ''}.` : ''} Vérifie puis crée la mission.`
+      msg.innerHTML = filled.length ? `<b>Lu automatiquement</b> : ${filled.join(', ')}${nd ? `, relevé d’heures (${h2(tot)} h)` : ''}.${shifted ? ' Dates du relevé recalées : premier jour pointé = jour de départ.' : ''}${o.A ? ` Annexe 6A : A = ${h2(o.A)} h${nd && Math.abs(o.A - tot) > 0.01 ? ` <b class="pneg">≠ ${h2(tot)} h lues dans le relevé : vérifie les heures</b>` : nd ? ' ✓ concorde avec le relevé' : ''}.` : ''} Vérifie puis crée la mission.`
         : 'Lecture automatique sans résultat (scan illisible ou autre formulaire) : complète à la main.';
     } catch(e) { if (pdfCur === cur) { msg.className = 'warn'; msg.textContent = 'Lecture automatique impossible (' + (e.message || e) + ') : complète à la main.'; } }
     if (pdfCur === cur) $('#pdfOk').disabled = false;
