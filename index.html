@@ -435,6 +435,13 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 .ienum{width:84px;text-align:right}
 .hscap{font-size:13px;line-height:1.5;border-top:1px solid var(--line-2);padding-top:8px;margin-top:4px}
 .ref{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;text-transform:none;color:var(--navy);border:1px solid color-mix(in srgb,var(--navy) 35%,transparent);border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:1px}
+.brief .body{padding:6px 10px}.bline{display:flex;align-items:flex-start;gap:12px;padding:10px 8px;border-radius:8px;cursor:pointer;border-bottom:1px solid var(--line-2)}.bline:last-child{border-bottom:0}.bline:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}
+.bico{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:15px;--bc:var(--ink-2);color:var(--bc);background:color-mix(in srgb,var(--bc) 16%,transparent);border:1.5px solid var(--bc)}.bico.ok{--bc:var(--good)}.bico.wa{--bc:var(--warn)}.bico.ko{--bc:var(--bad)}.bico.in{--bc:var(--navy)}
+.btx{flex:1;min-width:0}.btx b{display:block;font-size:15px;font-weight:600;line-height:1.35}.btx small{display:block;color:var(--ink-2);font-size:13px;margin-top:2px}.bgo{flex:none;align-self:center;color:var(--ink-2);font-size:13px;white-space:nowrap}
+details.card>summary .tag{margin-left:auto;font-family:var(--f-mono);letter-spacing:0;text-transform:none;font-weight:500}details.card>summary .tag+*{margin-left:0}details.card>summary:has(.tag)::after{margin-left:8px}
+details.card.fold:not([open])>summary{border-bottom:0}
+.howto{margin-top:8px}.howto>summary{cursor:pointer;font-size:13px;color:var(--navy);font-weight:600}.howto>p{margin:6px 0 0}
+.ieset{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:0 0 6px;font-size:13px}.ieset label{display:flex;gap:6px;align-items:center}
 .paiet td{vertical-align:top}.paiet .pst{white-space:normal}
 .gapdet>td>.gaprep{width:0;min-width:100%;box-sizing:border-box}
 .gaprep dl{grid-template-columns:minmax(0,1fr) minmax(0,auto)}.gaprep dd{white-space:normal;overflow-wrap:anywhere;max-width:60ch}
@@ -705,55 +712,59 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
         <div id="paieMsg" class="warns" style="margin-top:8px"></div>
       </div>
     </section>
+    <section class="card brief"><h2>En bref <span class="tag">clique sur une ligne pour le détail</span></h2><div class="body" id="paieBrief"></div></section>
     <div class="hometop"><h2>Mes fiches <span class="note" id="paieCount" style="font-weight:400;font-size:13px"></span></h2><select id="paieYear" aria-label="Année" style="max-width:140px"></select></div>
     <section class="card"><div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
-      <thead><tr><th>Mois</th><th class="num">Brut</th><th class="num">Imposable</th><th class="num">Précompte</th><th class="num">Net</th><th class="num">Missions / HS</th><th>Payé pour</th></tr></thead>
+      <thead><tr><th>Mois</th><th class="num">Net reçu</th><th class="num">Brut</th><th>Mission payée</th></tr></thead>
       <tbody id="paieBody"></tbody></table></div></section>
-    <section class="card">
-      <h2>Barème salarial <span class="tag">plan flex inclus</span></h2>
+    <div class="hometop" style="margin-top:6px"><h2>Détails <span class="note" style="font-weight:400;font-size:13px">pour ceux qui veulent tout vérifier</span></h2></div>
+    <details class="card fold" id="foldGap">
+      <summary>Missions : contrôle du paiement <span class="tag" id="paieGapN"></span></summary>
+      <div class="body"><p class="note" style="margin:0">Pour chaque mission : les heures sup qui doivent être payées et ce qu’on retrouve sur tes fiches. <b>Clique sur une mission pour l’explication complète.</b></p>
+        <details class="howto"><summary>Comment c’est calculé ?</summary><p class="note">Heures sup après coefficient réparties entre récupération et paiement ; sur la fiche, seules les heures au-delà de l’horaire normal FN sont payées en heures sup (au prorata de la part payée). Attendu = rémunération mission brut calculée dans Heures Mission. Payé = lignes « Mission » et « Heures sup. » des fiches dont la période tombe pendant la mission (réparti au prorata si plusieurs missions le même mois). Les fiches doivent contenir au moins les heures sup de la mission ; un surplus est compté comme heures sup régulières (hors mission).</p></details></div>
+      <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
+        <thead><tr><th>Mission</th><th class="num">H. sup à payer</th><th class="num">Trouvées sur fiches</th><th class="num">Écart brut</th><th>Résultat</th></tr></thead>
+        <tbody id="paieGap"></tbody></table></div>
+      <div class="body" id="paieOrph"></div>
+    </details>
+    <details class="card fold" id="ieCard" hidden>
+      <summary><span id="ieTitle"></span> <span class="tag" id="ieTag"></span></summary>
+      <div class="body"><p class="note" style="margin:0" id="ieNote"></p></div>
+      <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
+        <thead><tr><th>Année</th><th class="num">Jours à l’étranger</th><th class="num">Montant estimé</th><th>À faire</th></tr></thead>
+        <tbody id="ieBody"></tbody></table></div>
+    </details>
+    <details class="card fold" id="foldBar">
+      <summary>Mon salaire vs barème <span class="tag" id="barTag"></span></summary>
       <div class="body">
-        <div class="paiedrop" style="margin-bottom:10px"><div><b>Barème (PDF ou Excel SETCa)</b><div class="note">Charge le nouveau barème à chaque indexation : chaque fiche est comparée au barème en vigueur à sa date (date d’application de l’index). Pour les fiches plus anciennes, charge aussi les barèmes précédents.</div><div id="grList" class="grlist"></div></div>
+        <div class="paiedrop" style="margin-bottom:10px"><div><b>Barème (PDF ou Excel SETCa)</b><div class="note">Charge le nouveau barème à chaque indexation (en général en juillet). Pour les fiches plus anciennes, charge aussi les barèmes précédents.</div><div id="grList" class="grlist"></div></div>
           <button type="button" class="btn" id="grImpBtn">Charger un barème…</button><input type="file" id="grFile" accept="application/pdf,.pdf,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden></div>
         <div id="grMsg" class="warns"></div>
         <div class="note" id="grPos" style="margin-top:4px"></div>
-        <p class="note" style="margin:10px 0 0">Salaire avant plan flex = « Rémunération » de la fiche + réductions de salaire du plan flex (leasing voiture, GSM…) reprises dans la communication de la fiche.</p>
+        <details class="howto"><summary>Comment c’est calculé ?</summary><p class="note">Chaque fiche est comparée au barème en vigueur à sa date (date d’application de l’index), selon ta catégorie, ton âge (méthode SETCa) et ton régime. Salaire avant plan flex = « Rémunération » de la fiche + réductions de salaire du plan flex (leasing voiture, GSM…) reprises dans la communication de la fiche.</p></details>
       </div>
       <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
         <thead><tr><th>Mois</th><th>Position</th><th class="num">Barème</th><th class="num">Rémunération</th><th class="num">Plan flex</th><th class="num">Avant flex</th><th class="num">Dérive</th><th class="num">%</th></tr></thead>
         <tbody id="grBody"></tbody></table></div>
       <div class="body" id="grSum"></div>
       <div class="body" id="grHist" style="padding-top:0"></div>
-    </section>
-    <section class="card">
-      <h2>Politique interne (travel policy)</h2>
+    </details>
+    <details class="card fold" id="foldPol">
+      <summary>Politique voyage (fichier de règles) <span class="tag" id="polTag"></span></summary>
       <div class="body"><div class="paiedrop"><div id="polInfo"></div><div style="display:flex;gap:8px"><button type="button" class="btn small" id="polDel" hidden>Retirer</button><button type="button" class="btn" id="polImpBtn">Charger la politique…</button></div><input type="file" id="polFile" accept=".json,application/json,.pdf" hidden></div>
         <div id="polMsg" class="warns" style="margin-top:8px"></div>
-        <p class="note" style="margin:8px 0 0">Fichier de règles gardé uniquement dans ta db : contrôles des allowances dans Heures Mission, suivi de l’indemnité annuelle ci-dessous et éléments ajoutés à la check-list voyage.</p></div>
-    </section>
-    <section class="card" id="ieCard" hidden>
-      <h2 id="ieTitle"></h2>
-      <div class="body"><p class="note" style="margin:0" id="ieNote"></p></div>
-      <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
-        <thead><tr><th>Année</th><th class="num">Jours hors Belgique</th><th>Droit</th><th class="num">Coef. K</th><th class="num">Frais/jour non engagés</th><th class="num">Estimation</th><th>Formulaire</th><th>Paiement</th></tr></thead>
-        <tbody id="ieBody"></tbody></table></div>
-    </section>
-    <section class="card">
-      <h2>Écarts missions encodées ↔ fiches de paie <span class="tag" id="paieGapN"></span></h2>
-      <div class="body"><p class="note" style="margin-top:0">Heures sup après coefficient réparties entre récupération et paiement ; sur la fiche, seules les heures au-delà de l’horaire normal FN sont payées en heures sup (au prorata de la part payée). Attendu = rémunération mission brut calculée dans Heures Mission. Payé = lignes « Mission » et « Heures sup. » des fiches dont la période tombe pendant la mission (réparti au prorata si plusieurs missions le même mois). Les fiches doivent contenir au moins les heures sup de la mission ; un surplus est compté comme heures sup régulières (hors mission). <b>Clique sur une mission pour l’analyse détaillée.</b></p></div>
-      <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
-        <thead><tr><th>Mission</th><th class="num">H. sup (× coef.)</th><th class="num">À récupérer</th><th class="num">Payées (× coef.)</th><th class="num">Attendues sur fiche</th><th class="num">Sur fiche</th><th class="num">Attendu brut</th><th class="num">Payé brut</th><th class="num">Écart</th><th>Statut</th></tr></thead>
-        <tbody id="paieGap"></tbody></table></div>
-      <div class="body" id="paieOrph"></div>
-    </section>
+        <p class="note" style="margin:8px 0 0">Fichier gardé uniquement dans ta db : il sert aux contrôles dans Heures Mission, à l’estimation de l’indemnité d’éloignement et ajoute des éléments à la check-list voyage.</p></div>
+    </details>
   </div>
   <div class="page" data-page="paied" hidden>
     <div class="hometop"><h2 id="pdTitle"></h2><div style="display:flex;gap:8px"><button type="button" class="btn small" id="pdBack">← Mes fiches</button><button type="button" class="btn small" id="pdDel">Supprimer</button></div></div>
     <section class="card"><div class="kpis k4" id="pdKpi"></div></section>
-    <section class="card"><h2>Payé ce mois pour tes missions</h2><div class="body" id="pdMis"></div></section>
-    <section class="card"><h2>Barème salarial</h2><div class="body rows" id="pdBar"></div></section>
-    <section class="card"><h2>Impôt et retenues</h2><div class="body rows" id="pdTax"></div></section>
-    <section class="card"><h2>Toutes les lignes <span class="tag">clique sur la catégorie pour la changer</span></h2>
-      <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet"><thead><tr><th>Code</th><th>Libellé</th><th>Période</th><th class="num">Heures</th><th class="num">Jours</th><th class="num">Montant</th><th>Catégorie</th></tr></thead><tbody id="pdLines"></tbody></table></div></section>
+    <section class="card brief"><h2>En bref</h2><div class="body" id="pdBrief"></div></section>
+    <details class="card fold" id="pdFoldMis"><summary>Payé ce mois pour tes missions</summary><div class="body" id="pdMis"></div></details>
+    <details class="card fold" id="pdFoldBar"><summary>Salaire vs barème</summary><div class="body rows" id="pdBar"></div></details>
+    <details class="card fold" id="pdFoldTax"><summary>Impôt et retenues</summary><div class="body rows" id="pdTax"></div></details>
+    <details class="card fold"><summary>Toutes les lignes de la fiche <span class="tag">clique sur la catégorie pour la changer</span></summary>
+      <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet"><thead><tr><th>Code</th><th>Libellé</th><th>Période</th><th class="num">Heures</th><th class="num">Jours</th><th class="num">Montant</th><th>Catégorie</th></tr></thead><tbody id="pdLines"></tbody></table></div></details>
   </div>
 
   <!-- Carnet de tir -->
@@ -3950,6 +3961,7 @@ function renderGrille(L){
   const ok = rows.filter(r => !r.b.err); let s = '';
   if (ok.length) { const ko = ok.filter(r => Math.abs(r.b.d) > 1); const sous = ko.filter(r => r.b.d < 0).length, sur = ko.length - sous; s = ko.length ? `<div class="warn"><b>${[sous && `${sous} mois sous le barème`, sur && `${sur} mois au-dessus`].filter(Boolean).join(', ')}.</b> Dérive moyenne : ${eur(ko.reduce((t, r) => t + r.b.d, 0) / ko.length)} / mois, cumul ${eur(ko.reduce((t, r) => t + r.b.d, 0))}.</div>` : `<div class="note">Toutes les fiches correspondent au barème (± 1 €).</div>`; }
   $('#grSum').innerHTML = s;
+  { const ko = ok.filter(r => Math.abs(r.b.d) > 1).length; $('#barTag').textContent = !G.length ? 'barème non chargé' : !ok.length ? '' : ko ? `${ko} mois à vérifier` : 'conforme'; }
   renderCatHist();
 }
 
@@ -3972,15 +3984,15 @@ function brutMois(ym){   // salaire mensuel brut (avant plan flex) de la fiche d
 }
 function renderIE(){
   const I = st.cfg && st.cfg.policy && st.cfg.policy.ie; $('#ieCard').hidden = false;
-  if (!I) { $('#ieTitle').textContent = 'Indemnité d’éloignement'; $('#ieNote').innerHTML = '<b>Pour voir l’estimation :</b> charge ta politique (fichier « Travel policy … .json ») dans la carte « Politique interne » juste au-dessus.'; $('#ieBody').innerHTML = ''; $('#ieCard').querySelector('.tablebox').hidden = true; return; }
+  if (!I) { $('#ieTitle').textContent = 'Indemnité d’éloignement'; $('#ieTag').textContent = 'politique non chargée'; ieRes = []; $('#ieNote').innerHTML = '<b>Pour voir l’estimation :</b> charge ta politique (fichier « Travel policy … .json ») dans la carte « Politique interne » juste au-dessus.'; $('#ieBody').innerHTML = ''; $('#ieCard').querySelector('.tablebox').hidden = true; return; }
   $('#ieCard').querySelector('.tablebox').hidden = false;
-  $('#ieTitle').textContent = I.label || 'Indemnité annuelle'; $('#ieNote').textContent = I.note || '';
+  $('#ieTitle').textContent = I.label || 'Indemnité annuelle'; $('#ieTag').textContent = ''; $('#ieNote').textContent = I.note || '';
   const by = {};
   for (const [, d] of Store.missions) { if (!d || !d.sum || !d.sum.depart) continue; const x = d.sum, y = x.depart.slice(0, 4), N = +x.N || 0, j7 = +(x.j7 ?? x.N) || 0;
     const same = I.excludeSameDay && (x.depart === x.retour || N <= 1), j = same ? 0 : j7;
     (by[y] = by[y] || { j: 0, n: 0, ms: [] }); by[y].j += j; by[y].n++; by[y].ms.push({ name: (d.mission && d.mission.nom) || x.ville || x.pays, j, N, ded: Math.max(0, N - j7), same, pays: x.pays, depart: x.depart, retour: x.retour || x.depart, mois: x.depart.slice(0, 7) }); }
   const yrs = Object.keys(by).sort().reverse(), today = todayIso(), min = +I.minDays || 0, mo = String(I.payMonth || 1).padStart(2, '0'), re = new RegExp(I.line || '^$', 'i');
-  const P = st.perso.ie = st.perso.ie || {};
+  const P = st.perso.ie = st.perso.ie || {}; ieRes = [];
   $('#ieBody').innerHTML = yrs.map(y => { const o = by[y], ok = o.j > min, y1 = String(+y + 1), slip = st.paies.find(p => p.mois === y1 + '-' + mo);
     const L = slip ? slip.lines.filter(L => re.test(normTxt(L.label))) : [], mt = L.reduce((s, x) => s + (x.mt || 0), 0);
     const cfg = P[y] || {}, k = cfg.k !== undefined && cfg.k !== '' ? num(cfg.k) : num(I.k ?? 1), sub = cfg.sub !== undefined && cfg.sub !== '' ? num(cfg.sub) : num(I.sub ?? 0);
@@ -3988,15 +4000,16 @@ function renderIE(){
     const tip = det.map(m => `${m.name} : ${h2(m.j)} j × ${h2(k)} × (${eur(m.b.v)}/30 − ${eur(sub)}) = ${eur(m.v)}`).join('\n');
     const pay = !ok ? '<span class="note">—</span>' : slip ? (L.length ? `<span class="pst ok">Payée : ${eur(mt)}</span>${est ? ` <small class="note">(${sgn(mt - est)} vs estim.)</small>` : ''}` : `<span class="pst ko">Absente de la fiche de ${moisLbl(y1 + '-' + mo)}</span>`) : `<span class="pst wa">À vérifier sur la fiche de ${moisLbl(y1 + '-' + mo)}</span>`;
     const dl = I.deadline ? `${y1}-${I.deadline}` : '', form = !ok || !dl ? '' : `${esc(I.form || 'formulaire')} pour le <b>${dFr(dl)}</b>${today > dl ? ' <small class="note">(dépassé)</small>' : ''}`;
-    const open = ieOpen.has(y);
-    return `<tr class="gaprow${open ? ' open' : ''}" data-ierow="${y}" title="Cliquer pour le détail du calcul"><td><b>${y}</b> <span class="gapchev">${open ? '▴' : '▾'}</span></td><td class="num">${h2(o.j)} j <span class="sub">${o.n} mission${o.n > 1 ? 's' : ''}</span></td><td>${ok ? `<span class="pst ok">Oui (&gt; ${min} j)</span>` : `<span class="note">Non (${h2(min - o.j)} j manquants)</span>`}</td>
-      <td class="num"><input class="ienum" type="number" step="0.01" min="0" data-iey="${y}" data-iek="k" value="${esc(cfg.k ?? '')}" placeholder="${h2(num(I.k ?? 1))}" aria-label="Coefficient K ${y}"></td>
-      <td class="num"><input class="ienum" type="number" step="0.01" min="0" data-iey="${y}" data-iek="sub" value="${esc(cfg.sub ?? '')}" placeholder="${h2(num(I.sub ?? 0))}" aria-label="Frais non engagés par jour ${y}"></td>
-      <td class="num" title="${esc(tip)}">${det.some(m => !m.b.v) ? '<span class="note">salaire inconnu : importe une fiche de paie</span>' : (ok ? `<b>${eur(est)}</b>` : `<span class="note" style="text-decoration:line-through">${eur(est)}</span>`) + `<span class="sub">${ok ? '' : 'pas de droit (≤ ' + min + ' j) · '}${det.length} mission${det.length > 1 ? 's' : ''} · survol = détail</span>`}</td>
-      <td>${form || '<span class="note">—</span>'}</td><td>${pay}</td></tr>${open ? `<tr class="gapdet"><td colspan="8">${ieReport(I, y, o, det, { ok, min, k, sub, est, slip, L, mt, y1, mo, dl })}</td></tr>` : ''}`; }).join('')
-    || `<tr><td colspan="8" class="note" style="padding:16px">Aucune mission encodée.</td></tr>`;
+    const open = ieOpen.has(y), unk = det.some(m => !m.b.v);
+    ieRes.push({ y, y1, ok, est, unk, j: o.j, min, dl, paid: slip ? (L.length ? mt : false) : null, mo });
+    const set = `<div class="ieset"><b>Réglages ${y}</b><label>Coef. K <input class="ienum" type="number" step="0.01" min="0" data-iey="${y}" data-iek="k" value="${esc(cfg.k ?? '')}" placeholder="${h2(num(I.k ?? 1))}" aria-label="Coefficient K ${y}"></label>
+      <label>Frais/jour non engagés <input class="ienum" type="number" step="0.01" min="0" data-iey="${y}" data-iek="sub" value="${esc(cfg.sub ?? '')}" placeholder="${h2(num(I.sub ?? 0))}" aria-label="Frais non engagés par jour ${y}"></label><small class="note">vide = valeur de la politique</small></div>`;
+    return `<tr class="gaprow${open ? ' open' : ''}" data-ierow="${y}" title="Cliquer pour le détail du calcul"><td><b>${y}</b> <span class="gapchev">${open ? '▴' : '▾'}</span></td><td class="num">${h2(o.j)} j <span class="sub">${o.n} mission${o.n > 1 ? 's' : ''} · ${ok ? `<span class="pst ok">droit ouvert</span>` : `minimum ${min} j`}</span></td>
+      <td class="num" title="${esc(tip)}">${unk ? '<span class="note">salaire inconnu : importe une fiche de paie</span>' : ok ? `<b>≈ ${eur(est)}</b>` : `<span class="note">pas de droit (il faut plus de ${min} j)</span>`}</td>
+      <td>${ok ? (form ? form + '<br>' : '') + pay : '<span class="note">—</span>'}</td></tr>${open ? `<tr class="gapdet"><td colspan="4">${set}${ieReport(I, y, o, det, { ok, min, k, sub, est, slip, L, mt, y1, mo, dl })}</td></tr>` : ''}`; }).join('')
+    || `<tr><td colspan="4" class="note" style="padding:16px">Aucune mission encodée.</td></tr>`;
 }
-const ieOpen = new Set();
+const ieOpen = new Set(); let ieRes = [];
 function ieReport(I, y, o, det, c){
   const R = I.refs || {}, ref = k => R[k] ? ` <span class="ref">${esc(R[k])}</span>` : '', dl = rows => `<dl>${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
   let h = `<div class="gaprep rows">`;
@@ -4046,7 +4059,7 @@ $('#polFile').addEventListener('change', e => { const f = e.target.files[0]; e.t
 $('#polDel').addEventListener('click', () => { const old = st.cfg.policy; if (!old) return; delete st.cfg.policy; Store.saveProfil(); renderPAIE(); undoToast('Politique retirée', () => { st.cfg.policy = old; Store.saveProfil(); renderPAIE(); }); });
 function renderPol(){ const P = st.cfg && st.cfg.policy;
   $('#polInfo').innerHTML = P ? `<b>${esc(P.name)}</b>${P.version ? ` · version ${esc(P.version)}` : ''} <small class="note">(${P.rules.length} règle${P.rules.length > 1 ? 's' : ''} de contrôle${P.ie ? ', ' + esc(P.ie.label || 'indemnité annuelle') : ''})</small>` : '<span class="note">Aucune politique chargée : les contrôles allowances et le suivi d’indemnité annuelle sont désactivés.</span>';
-  $('#polDel').hidden = !P; }
+  $('#polDel').hidden = !P; $('#polTag').textContent = P ? 'chargée' : 'non chargée'; }
 
 /* libellés des colonnes pour l'affichage mobile (cartes) */
 function autoLabel(root){ (root || document).querySelectorAll('table.hist.paiet').forEach(t => { const hs = t.tHead ? [...t.tHead.rows[0].cells].map(th => th.textContent.trim()) : []; if (!hs.length || !t.tBodies[0]) return;
@@ -4054,6 +4067,51 @@ function autoLabel(root){ (root || document).querySelectorAll('table.hist.paiet'
 
 /* --- vues --- */
 const sgn = (x, cls = true) => `<span class="${cls ? (x < -0.005 ? 'pneg' : x > 0.005 ? 'ppos' : '') : ''}">${x > 0.005 ? '+' : ''}${eur(x)}</span>`;
+/* --- résumé simple (« En bref ») : une phrase par sujet, le détail en cliquant --- */
+const stLbl = m => m.st[1].replace(/^OK/, 'Bien payée').replace(/^En attente$/, 'En attente de la fiche');
+const bLine = (c, ico, t, sub, act, go) => `<div class="bline" role="button" tabindex="0" ${act}><span class="bico ${c}" aria-hidden="true">${ico}</span><span class="btx"><b>${t}</b>${sub ? `<small>${sub}</small>` : ''}</span><span class="bgo">${go || 'Détail ›'}</span></div>`;
+const ICO = { ok: '✓', wa: '!', ko: '✕', in: '€' };
+function briefBar(p){ const b = baremeOf(p), act = 'data-fold="foldBar"';
+  if (!grilles().length) return bLine('wa', ICO.wa, 'Salaire pas encore vérifié', 'Charge le barème SETCa pour comparer ton salaire.', act, 'Charger ›');
+  if (b.err) return bLine('wa', ICO.wa, 'Salaire pas encore vérifié', esc(b.err), act);
+  const sub = `Catégorie ${b.classe} · barème du ${dFr(b.g.date)}`;
+  return Math.abs(b.d) <= 1 ? bLine('ok', ICO.ok, 'Ton salaire correspond au barème', sub, act)
+    : b.d < 0 ? bLine('ko', ICO.ko, `Ton salaire est ${eur(-b.d)} sous le barème (par mois)`, sub + ' · à signaler aux RH', act)
+    : bLine('ok', ICO.ok, `Ton salaire est ${eur(b.d)} au-dessus du barème`, sub, act); }
+function renderBrief(L, M, G){
+  const out = [], last = [...st.paies].sort((a, b) => b.mois.localeCompare(a.mois))[0];
+  if (!last) out.push(bLine('in', '↑', 'Importe ta première fiche de paie', 'Bouton « Choisir des PDF… » ci-dessus. Les données restent dans ta db.', 'data-pick="1"', 'Importer ›'));
+  else { const c = paieCalc(last); out.push(bLine('in', ICO.in, `${moisCap(last.mois)} : ${eur(c.net)} net reçus`, `Brut ${eur(c.brut)} · impôt retenu ${pct(c.tx)} de l’imposable`, `data-pid="${esc(last.id)}"`, 'Ouvrir ›')); out.push(briefBar(last)); }
+  const sorted = M.slice().sort((a, b) => ({ ko: 0, wa: 1, ok: 2 })[a.st[0]] - ({ ko: 0, wa: 1, ok: 2 })[b.st[0]] || b.depart.localeCompare(a.depart));
+  for (const m of sorted.slice(0, 6)) { const act = `data-fold="foldGap" data-gopen="${esc(m.id)}"`, nm = `Mission ${esc(m.name)}`;
+    let t, sub = `${dFr(m.depart)} → ${dFr(m.retour)}`;
+    if (!m.seen) { t = m.st[0] === 'ko' ? `${nm} : pas trouvée sur tes fiches` : `${nm} : en attente de la fiche de paie`; sub += m.st[0] === 'ko' ? ' · à signaler aux RH' : ' · elle apparaît en général sur la fiche du mois suivant'; }
+    else if (m.st[0] === 'ok') { t = `${nm} : bien payée`; sub += m.reg ? ` · + ${h2(m.reg)} h sup régulières en plus` : ''; }
+    else if (m.dH > 0.25 && m.hsExp) { t = `${nm} : il manque ${h2(m.dH)} h sup sur tes fiches`; sub += ` · écart ${eur(m.gap)} brut · à signaler aux RH`; }
+    else { t = m.gap < 0 ? `${nm} : payée ${eur(-m.gap)} en moins` : `${nm} : payée ${eur(m.gap)} en plus`; sub += m.gap < 0 ? ' · à signaler aux RH' : ' · vérifie avec les RH'; }
+    if (m.rec) sub += ` · ${h2(m.rec)} h à récupérer`;
+    out.push(bLine(m.st[0], ICO[m.st[0]], t, sub, act)); }
+  if (sorted.length > 6) out.push(bLine('in', '…', `${sorted.length - 6} autre${sorted.length - 6 > 1 ? 's' : ''} mission${sorted.length - 6 > 1 ? 's' : ''}`, '', 'data-fold="foldGap"', 'Voir ›'));
+  if (G.orph.length) out.push(bLine('wa', ICO.wa, 'Paiement de mission sans mission encodée', G.orph.map(o => `${moisLbl(o.k)} (${eur(o.mt)})`).join(', ') + ' · encode la mission dans Heures Mission', 'data-fold="foldGap"'));
+  const I = st.cfg && st.cfg.policy && st.cfg.policy.ie;
+  if (!I) out.push(bLine('wa', ICO.wa, 'Indemnité d’éloignement : pas d’estimation', 'Charge la politique voyage (fichier) pour l’estimer.', 'data-fold="foldPol"', 'Charger ›'));
+  else { const r = ieRes.filter(x => paieYear === 'all' || x.y === paieYear)[0]; const nm = I.label || 'Indemnité d’éloignement';
+    if (r) { const act = `data-fold="ieCard" data-ieopen="${r.y}"`;
+      if (!r.ok) out.push(bLine('in', 'i', `${nm} ${r.y} : pas encore de droit`, `${h2(r.j)} jours à l’étranger, il en faut plus de ${r.min}.`, act));
+      else if (r.paid !== null && r.paid !== false) out.push(bLine('ok', ICO.ok, `${nm} ${r.y} : payée ${eur(r.paid)}`, `Estimation de l’app : ${eur(r.est)}`, act));
+      else if (r.paid === false) out.push(bLine('ko', ICO.ko, `${nm} ${r.y} : absente de la fiche de ${moisLbl(r.y1 + '-' + r.mo)}`, `Estimation ≈ ${eur(r.est)} · à signaler aux RH`, act));
+      else out.push(bLine('in', ICO.in, r.unk ? `${nm} ${r.y} : droit ouvert` : `${nm} ${r.y} : environ ${eur(r.est)}`, `${r.dl ? `Formulaire à remettre avant le ${dFr(r.dl)} · ` : ''}payée avec la fiche de ${moisLbl(r.y1 + '-' + r.mo)}`, act)); } }
+  $('#paieBrief').innerHTML = out.join('');
+}
+function briefGo(e){ const el = e.target.closest('.bline'); if (!el) return; if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return; if (e.type === 'keydown') e.preventDefault();
+  if (el.dataset.pid) { paieId = el.dataset.pid; go('paied'); return; }
+  if (el.dataset.pick) { $('#paieFile').click(); return; }
+  if (el.dataset.gopen) gapOpen.add(el.dataset.gopen);
+  if (el.dataset.ieopen) ieOpen.add(el.dataset.ieopen);
+  if (el.dataset.gopen || el.dataset.ieopen) renderPAIE();
+  const f = document.getElementById(el.dataset.fold); if (!f) return; f.open = true;
+  const tgt = (el.dataset.gopen && f.querySelector(`tr[data-gid="${CSS.escape(el.dataset.gopen)}"]`)) || f; tgt.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+['click', 'keydown'].forEach(t => $('#paieBrief').addEventListener(t, briefGo));
 function renderPAIE(){
   syncBrut();
   const yrs = [...new Set(st.paies.map(p => p.mois.slice(0, 4)))].sort().reverse();
@@ -4064,17 +4122,18 @@ function renderPAIE(){
   $('#paieCount').textContent = st.paies.length ? `${L.length} fiche${L.length > 1 ? 's' : ''}` : '';
   $('#paieBody').innerHTML = L.map(p => { const c = paieCalc(p), pers = [...new Set(c.mis.map(x => x.per || p.mois))].sort();
     const who = pers.map(k => { const ms = misOfMonth(k); return ms.length ? ms.map(m => esc(m.name)).join(', ') + ` <small class="note">(${moisLbl(k)})</small>` : `<small class="note">${moisLbl(k)} — aucune mission encodée</small>`; }).join('<br>');
-    return `<tr data-pid="${esc(p.id)}"><td><b>${moisCap(p.mois)}</b></td><td class="num">${eur(c.brut)}</td><td class="num">${eur(c.imp)}</td><td class="num">${eur(c.prec)}<span class="sub">${pct(c.tx)}</span></td><td class="num"><b>${eur(c.net)}</b></td><td class="num">${c.misMt ? eur(c.misMt) : '—'}</td><td>${who || '<span class="note">—</span>'}</td></tr>`; }).join('')
-    || `<tr><td colspan="7" class="note" style="padding:16px">Aucune fiche pour l’instant : importe un PDF ci-dessus.</td></tr>`;
+    return `<tr data-pid="${esc(p.id)}" title="Ouvrir la fiche"><td><b>${moisCap(p.mois)}</b></td><td class="num"><b>${eur(c.net)}</b></td><td class="num">${eur(c.brut)}</td><td>${who ? who + (c.misMt ? ` <small class="note">· ${eur(c.misMt)}</small>` : '') : '<span class="note">—</span>'}</td></tr>`; }).join('')
+    || `<tr><td colspan="4" class="note" style="padding:16px">Aucune fiche pour l’instant : importe un PDF ci-dessus.</td></tr>`;
   const G = gapCalc(), M = G.M.filter(m => paieYear === 'all' || m.depart.startsWith(paieYear) || m.retour.startsWith(paieYear));
   const nko = M.filter(m => m.st[0] !== 'ok').length; $('#paieGapN').textContent = M.length ? (nko ? `${nko} à vérifier` : 'tout est OK') : '';
-  $('#paieGap').innerHTML = M.map(m => `<tr data-gid="${esc(m.id)}" class="gaprow${gapOpen.has(m.id) ? ' open' : ''}" title="Cliquer pour l’analyse détaillée"><td><b>${esc(m.name)}</b><span class="sub">${dFr(m.depart)} → ${dFr(m.retour)}</span></td><td class="num">${h2(m.maj)} h</td><td class="num">${h2(m.rec)} h</td><td class="num">${h2(m.paidC)} h</td><td class="num"><b>${h2(m.hsExp)} h</b></td><td class="num">${m.seen ? h2(m.paidH) + ' h' : '—'}</td><td class="num">${eur(m.exp)}</td><td class="num">${m.seen ? eur(m.paid) : '—'}</td><td class="num">${m.seen ? sgn(m.gap) : '—'}</td><td><span class="pst ${m.st[0]}">${m.st[1]}</span> <span class="gapchev" aria-hidden="true">${gapOpen.has(m.id) ? '▴' : '▾'}</span></td></tr>${gapOpen.has(m.id) ? `<tr class="gapdet"><td colspan="10">${gapReport(m)}</td></tr>` : ''}`).join('')
-    || `<tr><td colspan="10" class="note" style="padding:16px">Aucune mission encodée dans Heures Mission${paieYear !== 'all' ? ' pour ' + paieYear : ''}.</td></tr>`;
+  $('#paieGap').innerHTML = M.map(m => `<tr data-gid="${esc(m.id)}" class="gaprow${gapOpen.has(m.id) ? ' open' : ''}" title="Cliquer pour l’analyse détaillée"><td><b>${esc(m.name)}</b><span class="sub">${dFr(m.depart)} → ${dFr(m.retour)}</span></td><td class="num"><b>${h2(m.hsExp)} h</b>${m.rec ? `<span class="sub">+ ${h2(m.rec)} h à récupérer</span>` : ''}</td><td class="num">${m.seen ? h2(m.paidH) + ' h' : '—'}</td><td class="num">${m.seen ? sgn(m.gap) : '—'}</td><td><span class="pst ${m.st[0]}">${stLbl(m)}</span> <span class="gapchev" aria-hidden="true">${gapOpen.has(m.id) ? '▴' : '▾'}</span></td></tr>${gapOpen.has(m.id) ? `<tr class="gapdet"><td colspan="5">${gapReport(m)}</td></tr>` : ''}`).join('')
+    || `<tr><td colspan="5" class="note" style="padding:16px">Aucune mission encodée dans Heures Mission${paieYear !== 'all' ? ' pour ' + paieYear : ''}.</td></tr>`;
   $('#paieOrph').innerHTML = G.orph.length ? `<div class="warn"><b>Lignes mission / HS sans mission encodée :</b> ${G.orph.map(o => `${moisLbl(o.k)} (${eur(o.mt)})`).join(', ')}. Encode la mission dans Heures Mission, ou change la catégorie de la ligne si ce n’est pas une mission.</div>` : '';
   $('#paieOrph').hidden = !G.orph.length;
   renderGrille(L);
   renderIE();
   renderPol();
+  renderBrief(L, M, G);
   autoLabel($('[data-page=paie]'));
 }
 $('#paieGap').addEventListener('click', e => { const tr = e.target.closest('tr[data-gid]'); if (!tr) return; const id = tr.dataset.gid; gapOpen.has(id) ? gapOpen.delete(id) : gapOpen.add(id); renderPAIE(); });
@@ -4086,7 +4145,7 @@ function renderPAIED(){
   const p = st.paies.find(x => x.id === paieId); if (!p) { go('paie'); return; }
   const c = paieCalc(p), R = paieRef(p);
   $('#pdTitle').textContent = 'Fiche de paie — ' + moisLbl(p.mois);
-  $('#pdKpi').innerHTML = [['Brut ONSS', eur(c.brut)], ['Imposable', eur(c.imp)], [`Précompte (${pct(c.tx)})`, eur(c.prec)], ['Net payé', eur(c.net)]].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  $('#pdKpi').innerHTML = [['Net reçu', eur(c.net)], ['Brut', eur(c.brut)], [`Impôt retenu (${pct(c.tx)})`, eur(c.prec)], ['Imposable', eur(c.imp)]].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
   const per = {}; for (const L of c.mis) (per[L.per || p.mois] = per[L.per || p.mois] || []).push(L);
   $('#pdMis').innerHTML = Object.keys(per).sort().map(k => { const ms = misOfMonth(k), tot = per[k].reduce((s, L) => s + (L.mt || 0), 0);
     return `<div class="pmis"><h4>${moisCap(k)}${k !== p.mois ? ' <small class="note">(rattrapage)</small>' : ''} : ${ms.length ? ms.map(m => `mission « ${esc(m.name)} » <small class="note">${dFr(m.depart)} → ${dFr(m.retour)}</small>`).join(', ') : '<span class="pneg">aucune mission encodée ce mois-là</span>'}</h4>
@@ -4107,12 +4166,19 @@ function renderPAIED(){
     : `<dl>${[[`Barème ${dFr(b.g.date)} <small>catégorie ${b.classe} · ${b.age} · ${REGS[b.regime]}</small>`, eur(b.bar)], [`<small>Calcul SETCa : ${b.how}${b.regime !== 100 ? ' × ' + b.regime + ' %' : ''}</small>`, ''], ['Rémunération sur la fiche', eur(b.base)],
       ...b.flexL.map(L => [`+ ${esc(L.label)} <small>plan flex</small>`, eur(-L.mt)]), ['= Salaire avant plan flex', `<b>${eur(b.theo)}</b>`], ['Dérive vs barème', `<span class="mark">${sgn(b.d, false)}</span> <small class="note">(${pct(b.dp)})</small>`]].map(([a, v]) => `<dt>${a}</dt><dd>${v}</dd>`).join('')}</dl>`
 ; }
+  { const out = [], per2 = {}; for (const L of c.mis) { const k = L.per || p.mois; per2[k] = (per2[k] || 0) + (L.mt || 0); }
+    for (const [k, mt] of Object.entries(per2).sort()) { const ms = misOfMonth(k); out.push(bLine(ms.length ? 'in' : 'wa', ms.length ? ICO.in : ICO.wa, ms.length ? `Payé pour la mission ${ms.map(m => esc(m.name)).join(', ')} : ${eur(mt)}` : `Paiement de mission (${moisLbl(k)}) : ${eur(mt)}`, ms.length ? `Période ${moisLbl(k)}${k !== p.mois ? ' (rattrapage)' : ''} · le contrôle complet est dans « Mes fiches »` : 'Aucune mission encodée ce mois-là', 'data-fold="pdFoldMis"')); }
+    if (!Object.keys(per2).length) out.push(bLine('in', 'i', 'Pas de paiement de mission sur cette fiche', '', 'data-fold="pdFoldMis"'));
+    { const R = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup'); if (R.length) out.push(bLine('in', 'i', 'Récupération d’heures sup de ton contingent', R.map(L => `${L.h ? h2(L.h) + ' h' : ''} ${L.per ? moisLbl(L.per) : ''}`.trim()).join(' · ') + ' · hors mission', 'data-fold="pdFoldMis"')); }
+    out.push(briefBar(p).replace('data-fold="foldBar"', 'data-fold="pdFoldBar"'));
+    $('#pdBrief').innerHTML = out.join(''); }
   $('#pdLines').innerHTML = p.lines.map((L, i) => { const k = pcat(L), ed = L.sec === 'brut';
     return `<tr><td class="note">${esc(L.code)}</td><td>${esc(L.label)}</td><td>${L.per ? moisLbl(L.per) : ''}</td><td class="num">${L.h != null ? h2(L.h) : ''}</td><td class="num">${L.j != null ? h2(L.j) : ''}</td><td class="num">${L.mt != null ? eur(L.mt) : ''}</td><td>${ed ? `<button type="button" class="pcat" data-c="${k}" data-li="${i}" title="Changer la catégorie">${PCATS[k]}</button>` : `<span class="note">${isPrec(L) ? 'Précompte' : isOnss(L) ? 'ONSS' : 'Retenue / autre'}</span>`}</td></tr>`; }).join('');
 }
 $('#pdLines').addEventListener('click', e => { const b = e.target.closest('[data-li]'); if (!b) return; const p = st.paies.find(x => x.id === paieId); const L = p && p.lines[+b.dataset.li]; if (!L) return;
   const nx = PCYCLE[(PCYCLE.indexOf(pcat(L)) + 1) % PCYCLE.length]; st.cfg = st.cfg || {}; st.cfg.paieMap = { ...(st.cfg.paieMap || {}), [normTxt(L.label)]: nx };
   Store.saveProfil(); renderPAIED(); saveState(`« ${L.label} » → ${PCATS[nx]} (toutes les fiches)`); });
+['click', 'keydown'].forEach(t => $('#pdBrief').addEventListener(t, e => { const el = e.target.closest('.bline'); if (!el || (e.type === 'keydown' && e.key !== 'Enter')) return; const f = document.getElementById(el.dataset.fold); if (f) { f.open = true; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }));
 $('#pdBack').addEventListener('click', () => go('paie'));
 $('#pdDel').addEventListener('click', () => { const i = st.paies.findIndex(x => x.id === paieId); if (i < 0) return; const old = st.paies[i];
   st.paies.splice(i, 1); Store.saveProfil(); go('paie'); undoToast(`Fiche ${moisLbl(old.mois)} supprimée`, () => { st.paies.push(old); Store.saveProfil(); renderPAIE(); }); });
