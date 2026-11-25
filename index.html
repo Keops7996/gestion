@@ -1055,6 +1055,7 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
           <div class="f"><label for="pi_ret">Retour</label><input type="date" id="pi_ret"></div>
           <div class="f"><label for="pi_nature">Nature</label><input id="pi_nature"></div>
           <div class="f"><label for="pi_dem">Demandée par</label><input id="pi_dem"></div>
+          <div class="f"><label for="pi_cf">CF / N° commande</label><input id="pi_cf"></div>
           <div class="f"><label for="pi_recup">Heures à récupérer <span class="hint">(0 = paiement intégral)</span></label><input type="number" id="pi_recup" min="0" step="0.5"></div>
         </div>
         <h3 class="pdh">Relevé d’heures <span class="note">T = travail · D = déplacement · A = attente — total <b id="pi_tot">0 h</b></span></h3>
@@ -2377,7 +2378,7 @@ function parse6A(r){
   const o = { ville: g(/Ville\s*:?\s*(.+?)\s+Pays/i), pays: g(/Pays\s*:?\s*(.+?)\s+A\s*[\/I1l|]?\s*R\s*>/i) || g(/Pays\s*:?\s*([^\n]+)/i),
     depart: iso(g(/d[ée]part\s*:?\s*([\d\/.-]{8,10})/i)), retour: iso(g(/retour\s*:?\s*([\d\/.-]{8,10})/i)),
     nature: g(/Nature de la mission\s*:?\s*([^\n]+)/i), demande: g(/demand[ée]e par\s*:?\s*(.+?)(?:\s+CF|\n|$)/i), client: g(/Utilisateurs\s+([^\n]+)/i),
-    ar800: /800\s*km\s*:?\s*NON/i.test(t) ? 'NON' : /800\s*km\s*:?\s*OUI/i.test(t) ? 'OUI' : '', A: ocrNum(g(/imposée\)?\s*:?\s*(\d+[.,]?\d*)/i)) };
+    cf: (t.match(/CF\s*-?\s*N\S*\s*Cde\s*:?\s*(\d{3,})/i) || [])[1] || '', ar800: /800\s*km\s*:?\s*NON/i.test(t) ? 'NON' : /800\s*km\s*:?\s*OUI/i.test(t) ? 'OUI' : '', A: ocrNum(g(/imposée\)?\s*:?\s*(\d+[.,]?\d*)/i)) };
   return o;
 }
 async function parseRecup(r){
@@ -2469,19 +2470,24 @@ async function parseReleveGrid(r, year){
   const xs = gridLines(cv, 'v', 0.25), ys = gridLines(cv, 'h', 0.3);
   if (xs.length < 10 || ys.length < 6) return null;
   const cols = xs.slice(-9);                       // Lu Ma Me Je Ve Sa Di | Total
-  // blocs de semaine : intervalle ≈ 3 lignes (T, D, A) suivi d'une ligne de total ; la date « du jj/mm » est lue dans la colonne de gauche du bloc
+  // lignes du tableau : chaque intervalle entre traits est découpé en lignes de hauteur ≈ rowH (les traits fins entre T/D/A ne sont pas toujours visibles)
   const iv = ys.slice(0, -1).map((y, i) => ({ y, h: ys[i + 1] - y })).filter(v => v.h > 12 * S), rowH = Math.min(...iv.map(v => v.h).filter(h => h > 20 * S));
-  const blocks = iv.filter(v => v.h > rowH * 2.4 && v.h < rowH * 3.8);
+  const rows = []; for (const v of iv) { const n = Math.round(v.h / rowH); if (n < 1 || n > 4) continue; for (let k = 0; k < n; k++) rows.push({ y: v.y + k * v.h / n, h: v.h / n }); }
+  if (rows.length < 3) return null;
+  // colonne de gauche : libellé T / D / A et « du jj/mm au jj/mm »
+  const lt = await ocrRects(cv, rows.map(r0 => [xs[0] + 4 * S, r0.y + 3 * S, cols[0] - xs[0] - 8 * S, r0.h - 6 * S]), { psm: 7 });
+  rows.forEach((r0, i) => { r0.txt = lt[i] || ''; const m = r0.txt.trim().match(/(?:^|\s)([TDA])\W*$/); r0.lab = m ? m[1] : ''; });
+  const blocks = []; for (let i = 0; i + 2 < rows.length; i++) { const L = rows.slice(i, i + 3).map(r0 => r0.lab).join('');
+    if (L === 'TDA' || (rows[i].lab === 'T' && (rows[i + 1].lab === 'D' || rows[i + 2].lab === 'A')) || (rows[i + 2].lab === 'A' && rows[i + 1].lab === 'D')) { blocks.push({ rows: rows.slice(i, i + 3), txt: rows.slice(i, i + 4).map(r0 => r0.txt).join(' ') }); i += 2; } }
   if (!blocks.length) return null;
-  const lt = await ocrRects(cv, blocks.map(b => [xs[0] + 4 * S, b.y + 3 * S, cols[0] - xs[0] - 8 * S, b.h - 6 * S]), { psm: 6 });
   const cells = [], meta = [];
   // date de début de chaque semaine : la lecture peut se tromper d'un chiffre, on retient la base la plus cohérente (+7 jours par bloc)
-  const votes = {}; blocks.forEach((b, bi) => { const m = lt[bi].match(/du\w?\s*(\d{2})\s*\/\s*(\d{2})/i) || lt[bi].match(/(\d{2})\s*\/\s*(\d{2})/); if (!m) return;
+  const votes = {}; blocks.forEach((b, bi) => { const m = b.txt.match(/du\w?\s*(\d{2})\s*\/\s*(\d{2})/i) || b.txt.match(/(\d{2})\s*\/\s*(\d{2})/); if (!m) return;
     const t = Date.UTC(year, +m[2] - 1, +m[1]), dt = new Date(t); if (dt.getUTCMonth() !== +m[2] - 1) return; const base = t - bi * 7 * 864e5; votes[base] = (votes[base] || 0) + 1 + (dt.getUTCDay() === 1 ? 1 : 0); });
   const base = +Object.keys(votes).sort((x, y) => votes[y] - votes[x])[0]; if (!base) return null;
   blocks.forEach((b, bi) => { const start = new Date(base + bi * 7 * 864e5);
-    const rh = b.h / 3; ['t', 'd', 'a'].forEach((k, ri) => { for (let c = 0; c < 8; c++) {
-      const rc = [cols[c] + 3 * S, b.y + ri * rh - rh * 0.15, cols[c + 1] - cols[c] - 6 * S, rh * 1.3]; cells.push(rc); meta.push(c === 7 ? { k, total: true, bi } : { k, bi, day: new Date(start.getTime() + c * 864e5).toISOString().slice(0, 10) }); } }); });
+    ['t', 'd', 'a'].forEach((k, ri) => { const R = b.rows[ri]; for (let c = 0; c < 8; c++) {
+      const rc = [cols[c] + 3 * S, R.y - R.h * 0.15, cols[c + 1] - cols[c] - 6 * S, R.h * 1.3]; cells.push(rc); meta.push(c === 7 ? { k, total: true, bi } : { k, bi, day: new Date(start.getTime() + c * 864e5).toISOString().slice(0, 10) }); } }); });
   if (!cells.length) return {};
   const { sheet, pos } = cleanCells(cv, cells), idx = pos.map((p, i) => p ? i : -1).filter(i => i >= 0);
   const txt = cells.map(() => ''); if (idx.length) { const t1 = await ocrRects(sheet, idx.map(i => pos[i]), { psm: 7, whitelist: '0123456789,.' }); idx.forEach((i, j) => txt[i] = t1[j]); }
@@ -2537,7 +2543,7 @@ async function pdfNext(){
   const nom = String(pdfCur.file.name).replace(/\.pdf$/i, '').replace(/^[0-9a-f]{8}-/i, '').replace(/[_]+/g, ' ');
   const set = (id, v) => { $(id).value = v || ''; };
   set('#pi_nom', nom); set('#pi_ville', pre.ville); set('#pi_pays', (COUNTRIES.find(c => normTxt(c[0]) === normTxt(pre.pays || '')) || [pre.pays || ''])[0]);
-  set('#pi_dep', pre.depart); set('#pi_ret', pre.retour); set('#pi_nature', pre.nature); set('#pi_dem', pre.demande); $('#pi_ar').value = pre.ar800 || 'OUI'; set('#pi_recup', pre.recup);
+  set('#pi_cf', ''); set('#pi_dep', pre.depart); set('#pi_ret', pre.retour); set('#pi_nature', pre.nature); set('#pi_dem', pre.demande); $('#pi_ar').value = pre.ar800 || 'OUI'; set('#pi_recup', pre.recup);
   pdfDays(); ov.hidden = false; document.body.classList.add('modal-open'); $('#pi_nom').focus();
   if (!Object.values(pre).some(Boolean)) {          // PDF scanné : lecture automatique (OCR hors ligne)
     const cur = pdfCur, msg = $('#pdfScan'); msg.hidden = false; msg.className = 'warn'; msg.textContent = 'Lecture automatique du PDF scanné…'; $('#pdfOk').disabled = true;
@@ -2547,7 +2553,7 @@ async function pdfNext(){
       if (o.ville) { fill('#pi_ville', o.ville); filled.push('ville'); }
       if (o.pays) { const c = COUNTRIES.find(c => normTxt(c[0]) === normTxt(o.pays)) || COUNTRIES.find(c => normTxt(o.pays).startsWith(normTxt(c[0]).split(' (')[0]) && normTxt(c[0]).includes(normTxt(o.pays).split('(')[1]?.replace(')', '') || '§')) || COUNTRIES.find(c => normTxt(c[0]).startsWith(normTxt(o.pays).split(' ')[0])); $('#pi_pays').value = c ? c[0] : o.pays; filled.push('pays'); }
       if (o.depart) { $('#pi_dep').value = o.depart; filled.push('départ'); } if (o.retour) { $('#pi_ret').value = o.retour; filled.push('retour'); }
-      if (o.nature) { fill('#pi_nature', o.nature); filled.push('nature'); } if (o.demande) { fill('#pi_dem', o.demande); filled.push('demandeur'); }
+      if (o.nature) { fill('#pi_nature', o.nature); filled.push('nature'); } if (o.cf) { fill('#pi_cf', o.cf); filled.push('CF'); } if (o.demande) { fill('#pi_dem', o.demande); filled.push('demandeur'); }
       if (o.ar800) $('#pi_ar').value = o.ar800; if (o.recup != null) { $('#pi_recup').value = o.recup; filled.push('récup'); }
       pdfDays(); let nd = 0; for (const [d, v] of Object.entries(o.days || {})) for (const k of ['t', 'd', 'a']) { const el = $(`#pi_days [data-pd="${d}"][data-k="${k}"]`); if (el && v[k]) { el.value = v[k]; nd++; } }
       pdfTot(); const tot = Object.values(o.days || {}).reduce((s, v) => s + (v.t || 0) + (v.d || 0) + (v.a || 0), 0);
@@ -2580,7 +2586,7 @@ $('#pdfOk').addEventListener('click', async () => {
   for (const [d, o] of Object.entries(by)) { const H = (o.t || 0) + (o.d || 0) + (o.a || 0); if (!H) continue; const st0 = 8;
     days[d] = { debut: toHM(st0), fin: toHM(st0 + Math.min(H, 15.99)) }; if (o.d) days[d].dep = String(o.d); if (o.a) days[d].att = String(o.a); }
   const recup = num(v('#pi_recup'));
-  const src = { mission: { ...emptyMission(), nom: v('#pi_nom'), depart: dep, retour: ret, pays, ville: v('#pi_ville'), ar800: $('#pi_ar').value, nature: v('#pi_nature'), demande: v('#pi_dem') },
+  const src = { mission: { ...emptyMission(), nom: v('#pi_nom'), depart: dep, retour: ret, pays, ville: v('#pi_ville'), ar800: $('#pi_ar').value, nature: v('#pi_nature'), demande: v('#pi_dem'), cf: v('#pi_cf') },
     params: { ...freshParams(), paiement: recup > 0 ? 'partiel' : 'integral', recup: recup > 0 ? String(recup) : '' }, days };
   const id = missionId(src.mission), ex = Store.missions.get(id);
   const doc = buildDoc(src, { created: ex && ex.created, signDate: ex && ex.signDate, payDate: ex && ex.payDate, checklist: ex && ex.checklist });
