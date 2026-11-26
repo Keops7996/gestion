@@ -3659,7 +3659,7 @@ if (!Array.isArray(st.paies)) st.paies = [];
 const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const moisLbl = ym => { const [y, m] = String(ym || '').split('-'); return m ? `${MOIS_FR[+m - 1]} ${y}` : '—'; };
 const moisCap = ym => { const s = moisLbl(ym); return s.charAt(0).toUpperCase() + s.slice(1); };
-const PCATS = { mission: 'Mission', hs: 'Heures sup.', recup: 'Récup HS (hors mission)', base: 'Salaire', exc: 'Exceptionnel (prime…)', abs: 'Absence / congé', autre: 'Autre' };
+const PCATS = { mission: 'Mission', hs: 'Heures sup.', recup: 'Congé récup HS (payé)', base: 'Salaire', exc: 'Exceptionnel (prime…)', abs: 'Absence / congé', autre: 'Autre' };
 const PCYCLE = ['mission', 'hs', 'recup', 'base', 'exc', 'abs', 'autre'];
 const pnum = s => { s = String(s || '').trim(); if (!/^-?[\d.]*\d(,\d+)?-?$/.test(s)) return null; const neg = s.endsWith('-') || s.startsWith('-'); const v = parseFloat(s.replace(/-/g, '').replace(/\./g, '').replace(',', '.')); return isFinite(v) ? (neg ? -v : v) : null; };
 const pct = x => isFinite(x) ? (x * 100).toLocaleString('fr-BE', { maximumFractionDigits: 1 }) + ' %' : '—';
@@ -3872,18 +3872,18 @@ function joursDl(J){
 function recapYear(y){
   const P = st.paies.filter(p => p.mois.startsWith(y)).sort((a, b) => a.mois.localeCompare(b.mois)), IN = {}, OUT = {}, ex = [];
   const add = (o, k, v) => { o[k] = (o[k] || 0) + v; };
-  const LIN = { base: 'Salaire', mission: 'Missions et heures sup', hs: 'Missions et heures sup', recup: 'Récupération d’heures sup', exc: 'Primes et entrées exceptionnelles', abs: 'Absences payées', autre: 'Avantages en nature et autres' };
-  let net = 0;
-  for (const p of P) { net += p.tot.net || 0;
+  const LIN = { base: 'Salaire', mission: 'Missions et heures sup', hs: 'Missions et heures sup', recup: 'Congés pris sur les heures sup (81LH)', exc: 'Primes et entrées exceptionnelles', abs: 'Absences payées', autre: 'Avantages en nature et autres' };
+  let net = 0, recH = 0;
+  for (const p of P) { net += p.tot.net || 0; recH += p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup').reduce((s, L) => s + (L.h || 0), 0);
     for (const L of p.lines) { const v = L.mt || 0, c = L.sec === 'brut' ? pcat(L) : '';
-      if (c === 'exc' || c === 'abs') ex.push({ mois: p.mois, c, L });
+      if (c === 'exc' || c === 'abs' || c === 'recup') ex.push({ mois: p.mois, c, L });
       if (L.sec === 'brut') { if (v >= 0) add(IN, LIN[c], v); else add(OUT, c === 'abs' ? 'Absences non payées' : 'Autres retenues sur le brut', -v); }
       else if (isOnss(L) || /onss/.test(normTxt(L.label))) add(OUT, 'Cotisations ONSS', -v);
       else if (isPrec(L)) add(OUT, 'Précompte (impôt)', -v);
       else add(OUT, 'Chèques repas, avantages récupérés, autres', -v); } }
   for (const o of [IN, OUT]) for (const k of Object.keys(o)) if (Math.abs(o[k]) < 0.005) delete o[k];
   const tIn = Object.values(IN).reduce((a, b) => a + b, 0), tOut = Object.values(OUT).reduce((a, b) => a + b, 0);
-  return { y, P, IN, OUT, tIn, tOut, net, ex };
+  return { y, P, IN, OUT, tIn, tOut, net, ex, recH };
 }
 function renderRecap(){
   const ys = [...new Set(st.paies.map(p => p.mois.slice(0, 4)))].sort(), y = paieYear && paieYear !== 'all' ? paieYear : ys[ys.length - 1];
@@ -3895,8 +3895,8 @@ function renderRecap(){
     <div class="recapgrid"><div class="tablebox"><table class="hist"><thead><tr><th>IN · ce qui entre (brut)</th><th class="num">Montant</th><th class="num">%</th></tr></thead><tbody>${tb(R.IN, R.tIn)}<tr class="tot"><td><b>Total IN</b></td><td class="num"><b>${eur(R.tIn)}</b></td><td></td></tr></tbody></table></div>
     <div class="tablebox"><table class="hist"><thead><tr><th>OUT · ce qui sort</th><th class="num">Montant</th><th class="num">%</th></tr></thead><tbody>${tb(R.OUT, R.tIn)}<tr class="tot"><td><b>Total OUT</b></td><td class="num"><b>${eur(R.tOut)}</b></td><td></td></tr></tbody></table></div></div>
     <h3 class="lbl" style="margin:14px 0 6px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;font-size:12px">Entrées et sorties exceptionnelles</h3>
-    ${R.ex.length ? `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Mois</th><th>Ligne</th><th class="num">Heures / jours</th><th class="num">Montant</th></tr></thead><tbody>${R.ex.map(o => `<tr><td>${moisCap(o.mois)}</td><td><span class="pst ${o.c === 'exc' ? 'ok' : 'wa'}">${o.c === 'exc' ? 'IN' : (o.L.mt || 0) < 0 ? 'OUT' : 'absence'}</span> ${esc(o.L.code)} ${esc(o.L.label)}${o.L.per && o.L.per !== o.mois ? ` <small class="note">(${moisLbl(o.L.per)})</small>` : ''}</td><td class="num">${[o.L.h ? h2(o.L.h) + ' h' : '', o.L.j ? h2(o.L.j) + ' j' : ''].filter(Boolean).join(' · ') || '—'}</td><td class="num">${o.L.mt ? sgn(o.L.mt) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="note" style="margin:0">Aucune prime ni absence sur les fiches de cette année.</p>'}
-    <p class="note" style="margin:10px 0 0">IN = toutes les lignes positives du brut (le brut ONSS de chaque fiche). OUT = cotisations, précompte et retenues ; IN − OUT = net versé. Les avantages en nature (GSM, voiture…) sont ajoutés au brut puis récupérés : ils apparaissent des deux côtés.${miss.length ? ` <b>Fiches manquantes : ${miss.join(', ')}</b> — importe-les pour un récap complet.` : ''}</p>`;
+    ${R.ex.length ? `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Mois</th><th>Ligne</th><th class="num">Heures / jours</th><th class="num">Montant</th></tr></thead><tbody>${R.ex.map(o => `<tr><td>${moisCap(o.mois)}</td><td><span class="pst ${o.c === 'exc' ? 'ok' : o.c === 'recup' ? '' : 'wa'}">${o.c === 'exc' ? 'IN' : o.c === 'recup' ? 'congé récup' : (o.L.mt || 0) < 0 ? 'OUT' : 'absence'}</span> ${esc(o.L.code)} ${esc(o.L.label)}${o.L.per && o.L.per !== o.mois ? ` <small class="note">(${moisLbl(o.L.per)})</small>` : ''}</td><td class="num">${[o.L.h ? h2(o.L.h) + ' h' : '', o.L.j ? h2(o.L.j) + ' j' : ''].filter(Boolean).join(' · ') || '—'}</td><td class="num">${o.L.mt ? sgn(o.L.mt) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="note" style="margin:0">Aucune prime ni absence sur les fiches de cette année.</p>'}
+    <p class="note" style="margin:10px 0 0">IN = toutes les lignes positives du brut (le brut ONSS de chaque fiche). OUT = cotisations, précompte et retenues ; IN − OUT = net versé. Les avantages en nature (GSM, voiture…) sont ajoutés au brut puis récupérés : ils apparaissent des deux côtés.${R.recH ? ` Congés pris sur tes heures sup cette année : <b>${h2(R.recH)} h</b> (payés comme des jours travaillés).` : ''}${miss.length ? ` <b>Fiches manquantes : ${miss.join(', ')}</b> — importe-les pour un récap complet.` : ''}</p>`;
   return { R, miss };
 }
 const misOfMonth = k => misList().filter(m => m.months[k]);
@@ -3989,7 +3989,8 @@ function baremeOf(p){
   else { const n = 12 - m, b0 = at(a), b1 = at(a + 1); full = b0 + n * (b1 - b0) / 12; ageTxt = `${a} → ${cl(a + 1)} ans`;
     how = `${eur(b0)} (${a} ans) + ${n}/12 × (${eur(b1)} − ${eur(b0)})`; }
   const bar = Math.round(full * regime) / 100;
-  const base = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'base').reduce((s, L) => s + (L.mt || 0), 0);
+  const recL = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup' && L.mt), recMt = recL.reduce((s, L) => s + L.mt, 0);   // 81LH : congé pris sur les heures sup, payé comme un jour presté → fait partie du salaire du mois
+  const base = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'base').reduce((s, L) => s + (L.mt || 0), 0) + recMt;
   const flexL = p.comm.filter(L => /^red\.?\s*sal/.test(normTxt(L.label)) && L.mt), flex = -flexL.reduce((s, L) => s + L.mt, 0);
   const J = joursOf(p.mois), f = J.jp && J.jp.v < J.ouv - 0.01 ? J.jp.v / J.ouv : 1;
   const absL = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'abs' && L.mt), absMt = absL.reduce((s, L) => s + L.mt, 0);
@@ -3998,7 +3999,7 @@ function baremeOf(p){
     : [{ abs: 0, f, m: f < 1 ? 'rémunération au prorata des jours' : 'mois complet' }];
   const pick = C.map(c => ({ ...c, theo: base + flex + c.abs, att: Math.round(bar * c.f * 100) / 100 })).reduce((a, b) => Math.abs(b.theo - b.att) < Math.abs(a.theo - a.att) - 0.005 ? b : a);
   const theo = pick.theo, att = pick.att;
-  return { g, classe, regime, age: ageTxt, how, bar, att, f: pick.f, fJ: f, J, absL, absMt: pick.abs, meth: pick.m, base, flexL, flex, theo, d: theo - att, dp: att ? (theo - att) / att : NaN };
+  return { g, classe, regime, age: ageTxt, how, bar, att, recL, recMt, f: pick.f, fJ: f, J, absL, absMt: pick.abs, meth: pick.m, base, flexL, flex, theo, d: theo - att, dp: att ? (theo - att) / att : NaN };
 }
 async function parseGrilleXlsx(buf){
   const z = await JSZip.loadAsync(buf), rd = async n => { const f = z.file(n); return f ? f.async('string') : ''; };
@@ -4060,7 +4061,7 @@ function renderGrille(L){
   const rows = L.map(p => ({ p, b: baremeOf(p) }));
   $('#grBody').innerHTML = !G.length ? `<tr><td colspan="9" class="note" style="padding:16px">Charge le barème (PDF) pour comparer tes fiches.</td></tr>`
     : rows.map(({ p, b }) => b.err ? `<tr><td><b>${moisCap(p.mois)}</b></td><td colspan="8" class="note">${esc(b.err)}</td></tr>`
-      : `<tr data-pid="${esc(p.id)}"><td><b>${moisCap(p.mois)}</b><span class="sub">barème ${dFr(b.g.date)}</span></td><td>${b.classe} · ${b.age}${b.regime !== 100 ? ' · ' + REGS[b.regime] : ''}</td><td class="num">${b.J.jp ? `${h2(b.J.jp.v)} / ${b.J.ouv} j` : `— / ${b.J.ouv} j`}${b.J.ja ? `<span class="sub">+ ${h2(b.J.ja.v)} j assimilés</span>` : ''}</td><td class="num">${eur(b.att)}${b.f < 1 ? `<span class="sub">plein : ${eur(b.bar)}</span>` : ''}</td><td class="num">${eur(b.base)}${b.absMt ? `<span class="sub">absence ${eur(b.absMt)}</span>` : ''}</td><td class="num">${b.flex ? '+ ' + eur(b.flex) : '—'}</td><td class="num"><b>${eur(b.theo)}</b></td><td class="num">${sgn(b.d)}</td><td class="num">${pct(b.dp)}</td></tr>`).join('')
+      : `<tr data-pid="${esc(p.id)}"><td><b>${moisCap(p.mois)}</b><span class="sub">barème ${dFr(b.g.date)}</span></td><td>${b.classe} · ${b.age}${b.regime !== 100 ? ' · ' + REGS[b.regime] : ''}</td><td class="num">${b.J.jp ? `${h2(b.J.jp.v)} / ${b.J.ouv} j` : `— / ${b.J.ouv} j`}${b.J.ja ? `<span class="sub">+ ${h2(b.J.ja.v)} j assimilés</span>` : ''}</td><td class="num">${eur(b.att)}${b.f < 1 ? `<span class="sub">plein : ${eur(b.bar)}</span>` : ''}</td><td class="num">${eur(b.base)}${b.recMt ? `<span class="sub">dont congé récup ${eur(b.recMt)}</span>` : ''}${b.absMt ? `<span class="sub">absence ${eur(b.absMt)}</span>` : ''}</td><td class="num">${b.flex ? '+ ' + eur(b.flex) : '—'}</td><td class="num"><b>${eur(b.theo)}</b></td><td class="num">${sgn(b.d)}</td><td class="num">${pct(b.dp)}</td></tr>`).join('')
       || `<tr><td colspan="9" class="note" style="padding:16px">Aucune fiche pour cette période.</td></tr>`;
   const ok = rows.filter(r => !r.b.err); let s = '';
   if (ok.length) { const ko = ok.filter(r => Math.abs(r.b.d) > 1); const sous = ko.filter(r => r.b.d < 0).length, sur = ko.length - sous; s = ko.length ? `<div class="warn"><b>${[sous && `${sous} mois sous le barème`, sur && `${sur} mois au-dessus`].filter(Boolean).join(', ')}.</b> Dérive moyenne : ${eur(ko.reduce((t, r) => t + r.b.d, 0) / ko.length)} / mois, cumul ${eur(ko.reduce((t, r) => t + r.b.d, 0))}.</div>` : `<div class="note">Toutes les fiches correspondent au barème (± 1 €).</div>`; }
@@ -4070,7 +4071,7 @@ function renderGrille(L){
 }
 
 /* --- brut du profil = salaire de la dernière fiche (avant plan flex) --- */
-function brutFiche(p){ const base = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'base').reduce((s, L) => s + (L.mt || 0), 0);
+function brutFiche(p){ const base = p.lines.filter(L => L.sec === 'brut' && ['base', 'recup'].includes(pcat(L))).reduce((s, L) => s + (L.mt || 0), 0);
   const flex = -p.comm.filter(L => /^red\.?\s*sal/.test(normTxt(L.label)) && L.mt).reduce((s, L) => s + L.mt, 0); return { base, flex, tot: Math.round((base + flex) * 100) / 100 }; }
 function syncBrut(){
   const last = [...st.paies].filter(p => brutFiche(p).base > 0).sort((a, b) => b.mois.localeCompare(a.mois))[0], el = $('#u_brut'), lb = $('label[for=u_brut]');
@@ -4201,6 +4202,8 @@ function renderBrief(L, M, G){
   { const P = st.paies.filter(p => paieYear === 'all' || !paieYear || p.mois.startsWith(paieYear)).sort((a, b) => b.mois.localeCompare(a.mois)).slice(0, 12);
     for (const p of P) { const E = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'exc'), A = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'abs');
       if (E.length) out.push(bLine('in', '+', `${moisCap(p.mois)} : ${E.map(L => esc(L.label)).join(', ')} ${E.length === 1 ? eur(E[0].mt || 0) : ''}`.trim(), `Entrée exceptionnelle${E.length > 1 ? 's' : ''} : ${eur(E.reduce((s, L) => s + (L.mt || 0), 0))} brut · non comparée au barème`, `data-pid="${esc(p.id)}" data-pfold="pdFoldExc"`, 'Voir ›'));
+      const Rc = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup');
+      if (Rc.length) out.push(bLine('in', '⌂', `${moisCap(p.mois)} : congé pris sur tes heures sup — ${h2(Rc.reduce((s, L) => s + (L.h || 0), 0))} h`, 'Payé comme si tu étais venu travailler · pas une absence', `data-pid="${esc(p.id)}" data-pfold="pdFoldBar"`, 'Voir ›'));
       if (A.length) out.push(bLine('wa', '−', `${moisCap(p.mois)} : absence — ${A.map(L => esc(L.label)).join(', ')}`, A.map(L => [L.per && L.per !== p.mois ? 'période ' + moisLbl(L.per) : '', L.h ? h2(L.h) + ' h' : '', L.j ? h2(L.j) + ' j' : '', L.mt ? eur(L.mt) : ''].filter(Boolean).join(' · ')).join(' ; ') + ' · pris en compte dans les contrôles', `data-pid="${esc(p.id)}" data-pfold="pdFoldExc"`, 'Voir ›')); } }
   if (recapInfo) { const { R, miss } = recapInfo; out.push(bLine('in', 'Σ', `Récap ${R.y} : ${eur(R.net)} net reçus`, `Entrées ${eur(R.tIn)} · sorties ${eur(R.tOut)} (impôt ${eur(R.OUT['Précompte (impôt)'] || 0)}, ONSS ${eur(R.OUT['Cotisations ONSS'] || 0)})${miss.length ? ` · ${miss.length} fiche${miss.length > 1 ? 's' : ''} manquante${miss.length > 1 ? 's' : ''}` : ''}`, 'data-fold="foldRecap"', 'Récap ›')); }
   const I = st.cfg && st.cfg.policy && st.cfg.policy.ie;
@@ -4263,7 +4266,7 @@ function renderPAIED(){
       <ul>${per[k].map(L => `<li>${esc(L.label)}${L.h ? ` — ${h2(L.h)} h` : ''}${L.j ? ` — ${h2(L.j)} j` : ''} : <b>${eur(L.mt || 0)}</b> <small class="note">(${PCATS[pcat(L)]})</small></li>`).join('')}</ul>
       <div class="note" style="margin-top:4px">Total : <b>${eur(tot)}</b>${ms.length === 1 ? ` · attendu pour la mission : ${eur(ms[0].exp)} · HS après coef. : ${h2(ms[0].maj)} h, dont <b>${h2(ms[0].hsExp)} h payées</b> et <b>${h2(ms[0].rec)} h à récupérer</b>` : ''}</div></div>`; }).join('')
     || `<p class="note" style="margin:0">Aucune ligne « Mission » ou « Heures sup. » sur cette fiche. Si une ligne en est une, change sa catégorie plus bas.</p>`;
-  { const R = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup'); if (R.length) $('#pdMis').innerHTML += `<div class="pmis"><h4>Récupération d’heures sup du contingent <small class="note">(hors mission, non comparée aux missions)</small></h4><ul>${R.map(L => `<li>${esc(L.code)} ${esc(L.label)}${L.per ? ` — ${moisLbl(L.per)}` : ''}${L.h ? ` — ${h2(L.h)} h` : ''}${L.mt ? ` : ${eur(L.mt)}` : ''}</li>`).join('')}</ul></div>`; }
+  { const R = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup'); if (R.length) $('#pdMis').innerHTML += `<div class="pmis"><h4>Congé pris sur tes heures sup <small class="note">(payé comme un jour travaillé, hors mission, non comparée aux missions)</small></h4><ul>${R.map(L => `<li>${esc(L.code)} ${esc(L.label)}${L.per ? ` — ${moisLbl(L.per)}` : ''}${L.h ? ` — ${h2(L.h)} h` : ''}${L.mt ? ` : ${eur(L.mt)}` : ''}</li>`).join('')}</ul></div>`; }
   if (c.hsCom) $('#pdMis').innerHTML += `<p class="note" style="margin:6px 0 0">Communication de la fiche : ${p.comm.filter(L => /\bhs\b|suppl/.test(normTxt(L.label)) && L.h).map(L => `${esc(L.label)} ${moisLbl(L.per)} : ${h2(L.h)} h`).join(' · ')}.</p>`;
   const yr = p.mois.slice(0, 4), hsY = misList().filter(m => m.depart.startsWith(yr)).reduce((s, m) => s + m.hsExp, 0), appNet = hsY > hsCap() ? 0.45 : 0.66;
   const rows = [['Taux de précompte du mois <small>précompte / imposable</small>', pct(c.tx)], ['Cotisation ONSS <small>/ brut</small>', pct(c.txOnss)], ['Net / brut', pct(c.brut ? c.net / c.brut : NaN)]];
@@ -4275,13 +4278,13 @@ function renderPAIED(){
     $('#pdTax').innerHTML = `<dl>${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>` + (R ? '' : '<p class="note" style="margin:10px 0 0">Importe aussi une fiche d’un mois sans mission : l’app calculera alors l’impôt réellement prélevé sur la part mission / HS et l’écart avec l’hypothèse de l’app (66 % ou 45 % de net).</p>');
   { const b = baremeOf(p); $('#pdBar').innerHTML = b.err ? `<p class="note" style="margin:0">${esc(b.err)} Renseigne ta position dans « Barème salarial » (Mes fiches).</p>`
     : `<dl>${[[`Barème ${dFr(b.g.date)} <small>catégorie ${b.classe} · ${b.age} · ${REGS[b.regime]}</small>`, eur(b.bar)], [`<small>Calcul SETCa : ${b.how}${b.regime !== 100 ? ' × ' + b.regime + ' %' : ''}</small>`, ''], ...(b.f < 1 ? [[`× ${h2(b.J.jp.v)} jours rémunérés / ${b.J.ouv} jours ouvrables`, `= <b>${eur(b.att)}</b> attendus`]] : b.fJ < 1 ? [[`<small>${h2(b.J.jp.v)} / ${b.J.ouv} jours rémunérés : la fiche paie le mois complet${b.absMt ? ' et retire l’absence sur une ligne' : ''}</small>`, '']] : b.J.jp ? [[`<small>${h2(b.J.jp.v)} / ${b.J.ouv} jours rémunérés : mois complet</small>`, '']] : []),
-      ['Rémunération sur la fiche', eur(b.base)], ...b.absL.filter(() => b.absMt).map(L => [`${L.mt < 0 ? '−' : '+'} ${esc(L.code)} ${esc(L.label)} <small>absence</small>`, eur(L.mt)]),
+      ['Rémunération sur la fiche', eur(b.base - b.recMt)], ...b.recL.map(L => [`+ ${esc(L.code)} ${esc(L.label)} <small>congé pris sur tes heures sup, payé comme un jour travaillé${L.h ? ' · ' + h2(L.h) + ' h' : ''}</small>`, eur(L.mt)]), ...b.absL.filter(() => b.absMt).map(L => [`${L.mt < 0 ? '−' : '+'} ${esc(L.code)} ${esc(L.label)} <small>absence</small>`, eur(L.mt)]),
       ...b.flexL.map(L => [`+ ${esc(L.label)} <small>plan flex</small>`, eur(-L.mt)]), ['= Salaire avant plan flex', `<b>${eur(b.theo)}</b>`], ['Dérive vs barème', `<span class="mark">${sgn(b.d, false)}</span> <small class="note">(${pct(b.dp)})</small>`]].map(([a, v]) => `<dt>${a}</dt><dd>${v}</dd>`).join('')}</dl>`
 ; }
   { const out = [], per2 = {}; for (const L of c.mis) { const k = L.per || p.mois; per2[k] = (per2[k] || 0) + (L.mt || 0); }
     for (const [k, mt] of Object.entries(per2).sort()) { const ms = misOfMonth(k); out.push(bLine(ms.length ? 'in' : 'wa', ms.length ? ICO.in : ICO.wa, ms.length ? `Payé pour la mission ${ms.map(m => esc(m.name)).join(', ')} : ${eur(mt)}` : `Paiement de mission (${moisLbl(k)}) : ${eur(mt)}`, ms.length ? `Période ${moisLbl(k)}${k !== p.mois ? ' (rattrapage)' : ''} · le contrôle complet est dans « Mes fiches »` : 'Aucune mission encodée ce mois-là', 'data-fold="pdFoldMis"')); }
     if (!Object.keys(per2).length) out.push(bLine('in', 'i', 'Pas de paiement de mission sur cette fiche', '', 'data-fold="pdFoldMis"'));
-    { const R = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup'); if (R.length) out.push(bLine('in', 'i', 'Récupération d’heures sup de ton contingent', R.map(L => `${L.h ? h2(L.h) + ' h' : ''} ${L.per ? moisLbl(L.per) : ''}`.trim()).join(' · ') + ' · hors mission', 'data-fold="pdFoldMis"')); }
+    { const R = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup'); if (R.length) out.push(bLine('in', 'i', `Congé pris sur tes heures sup : ${h2(R.reduce((s, L) => s + (L.h || 0), 0))} h`, 'Payé comme si tu étais venu travailler · compté dans ton salaire du mois' + (R.some(L => L.mt) ? ` (${eur(R.reduce((s, L) => s + (L.mt || 0), 0))})` : ''), 'data-fold="pdFoldBar"')); }
     { const E = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'exc'), A = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'abs');
       for (const L of E) out.push(bLine('in', '+', `${esc(L.label)} : ${eur(L.mt || 0)}`, 'Entrée exceptionnelle · non comparée au barème', 'data-fold="pdFoldExc"'));
       for (const L of A) out.push(bLine('wa', '−', `Absence : ${esc(L.label)}`, [L.h ? h2(L.h) + ' h' : '', L.j ? h2(L.j) + ' j' : '', L.mt ? eur(L.mt) : ''].filter(Boolean).join(' · ') + ' · le contrôle du barème en tient compte', 'data-fold="pdFoldExc"')); }
