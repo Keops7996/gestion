@@ -3791,7 +3791,9 @@ function misList(){
       if (!x.prestees && !x.hs) why0 = 'aucune heure encodée dans la mission';
       else if (!(x.hs > 0)) why0 = `pas d’heures sup : ${h2(x.prestees || 0)} h prestées pour ${h2(x.fn || 0)} h d’horaire normal`;
       else if (part && H.maj > 0 && H.paid <= 0.005) why0 = `toutes les heures sont mises en récup (${h2(H.rec)} h sur ${h2(H.maj)} h après coefficient) : rien n’est payé sur la fiche`;
-      else { const b = brutMois(x.depart.slice(0, 7)).v, B = x.fn || 0; if (b > 0 && B > 0 && x.N) { exp = b * x.N / 30.4 / B * H.paid; est = true; why0 = `la mission a été enregistrée sans salaire brut (profil vide à ce moment-là) : montant estimé avec ${eur(b)} brut/mois`; } else why0 = 'salaire brut inconnu : complète le salaire dans le profil puis réenregistre la mission'; } }
+      else { let live = null; try { live = buildDoc(d, d).sum; } catch(e) {}
+        if (live && live.brut > 0) { exp = live.brut; why0 = `la mission avait été enregistrée sans salaire brut dans le profil : montant recalculé comme dans Heures Mission (${eur(exp)}) — réenregistre la mission pour le garder`; }
+        else { const b = brutMois(x.depart.slice(0, 7)).v, B = x.fn || 0; if (b > 0 && B > 0 && x.N) { exp = b * x.N / 30.4 / B * H.paid; est = true; why0 = `la mission a été enregistrée sans salaire brut (profil vide à ce moment-là) : montant estimé avec ${eur(b)} brut/mois`; } else why0 = 'salaire brut inconnu : complète le salaire dans le profil puis réenregistre la mission'; } } }
     out.push({ id, d, name: (d.mission && d.mission.nom) || x.ville || x.pays || 'Mission', depart: x.depart, retour: ret, months, n: n || 1, exp, why0, est, tot: hoursOf(d).tot, hsExp: hoursOf(d).raw, paidC: hoursOf(d).paid, rec: hoursOf(d).rec, maj: hoursOf(d).maj }); }
   return out.sort((a, b) => b.depart.localeCompare(a.depart));
 }
