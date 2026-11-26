@@ -3814,6 +3814,16 @@ function gapCalc(){
     m.absH = m.J.reduce((s, J, i) => s + Math.max(J.absH, J.ho ? Math.max(0, J.hth - J.ho.v) : 0) * m.per[i].hshare, 0);
     if (m.seen && m.hsExp && m.dH > 0.25) m.st = m.absH && m.dH - m.absH <= 0.25 ? ['wa', `Écart expliqué : ${h2(m.absH)} h non prestées à l’horaire`] : ['ko', `${h2(m.dH)} h sup de mission manquantes`];
     else if (m.reg) m.st = m.st[0] === 'ok' ? ['ok', `OK · + ${h2(m.reg)} h sup régulières`] : m.gap > 0 ? ['wa', `Payé en plus · ${h2(m.reg)} h sup régulières ?`] : [m.st[0], `${m.st[1]} · + ${h2(m.reg)} h sup régulières`]; }
+  // missions qui partagent un mois : la fiche les paie ensemble → on vérifie aussi le total du groupe
+  for (const m of M) { const G = new Set([m]); let grow = true; while (grow) { grow = false; for (const o of M) if (!G.has(o) && [...G].some(g => Object.keys(g.months).some(k => o.months[k]))) { G.add(o); grow = true; } }
+    if (G.size < 2) continue; const ks = new Set([...G].flatMap(g => Object.keys(g.months)));
+    const gp = [...ks].reduce((a, k) => a + (paid[k] || 0), 0), ge = [...G].reduce((a, g) => a + g.exp, 0), tol = Math.max(5, ge * 0.02);
+    m.grp = { others: [...G].filter(g => g !== m), paid: gp, exp: ge, gap: gp - ge, tol, ok: [...G].every(g => g.seen) && Math.abs(gp - ge) <= tol };
+    if (m.grp.ok && m.st[0] !== 'ok' && Math.abs(m.gap) > m.tol && !/h sup de mission manquantes/.test(m.st[1])) m.st = ['ok', `OK avec ${m.grp.others.map(g => g.name).join(', ')}`]; }
+  // lignes de paiement juste après la mission, sur un mois sans mission (rattrapage ?)
+  for (const m of M) { const ks = Object.keys(m.months).sort(), last = ks[ks.length - 1]; m.near = [];
+    for (let i = 1; i <= 2; i++) { const [y, mo] = last.split('-').map(Number), d = new Date(y, mo - 1 + i, 1), k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!M.some(o => o.months[k]) && Math.abs(paid[k] || 0) > 0.005) m.near.push({ k, mt: paid[k], src: src[k] || [] }); } }
   const orph = Object.keys(paid).filter(k => !M.some(m => m.months[k]) && Math.abs(paid[k]) > 0.005).sort().reverse().map(k => ({ k, mt: paid[k] }));
   return { M, orph };
 }
@@ -3864,6 +3874,13 @@ function gapReport(m){
         const dh = m.J.filter(J => J.ho && J.ho.v < J.hth - 0.25); if (dh.length) why.push(`Heures ouvrées sur la fiche : ${dh.map(J => `${moisLbl(J.k)} ${h2(J.ho.v)} h pour ${h2(J.hth)} h théoriques (horaire FN)`).join(', ')}. Si ce mois a eu des heures non prestées, les heures sup peuvent d’abord les compenser : à vérifier avec les RH.`); }
       if (m.per.some(P => P.src.some(o => o.kind === 'comm' && o.countH))) why.push('Les heures viennent surtout de la ligne « HS avec réduction fiscale » de la communication : elle ne reprend que les heures qui ont droit à la réduction fiscale (contingent limité), pas forcément toutes les heures payées.');
       if (m.dH > 0 && Math.abs(m.gap) <= m.tol) why.push('Les euros concordent pourtant : vérifie si la fiche compte les heures autrement (sans coefficient, ou seulement celles avec réduction fiscale) avant de réclamer.'); }
+    if (m.grp && Math.abs(m.gap) > m.tol) { const G = m.grp, nm = G.others.map(o => `« ${esc(o.name)} »`).join(', ');
+      why.unshift(G.ok ? `<b>Pas de manque réel.</b> Cette mission partage un mois avec ${nm} : la fiche paie les missions ensemble, l’app ne peut que <b>estimer</b> la part de chacune (au prorata de l’attendu). Au total, les fiches paient ${eur(G.paid)} pour ${eur(G.exp)} attendus : c’est correct (écart ${eur(G.gap)}).`
+        : `Cette mission partage un mois avec ${nm} : la part de chaque mission n’est qu’une estimation (au prorata de l’attendu). Au total pour ces missions, les fiches paient ${eur(G.paid)} pour ${eur(G.exp)} attendus (écart ${sgn(G.gap, false)}).`); }
+    if (m.gap < -m.tol) { const tot = m.per.reduce((a, P) => a + P.paid, 0), cut = m.per.filter(P => P.share < 0.999 && P.paid);
+      if (cut.length) why.push(`D’où viennent les ${eur(-m.gap)} : les lignes trouvées pour ${m.per.length > 1 ? 'ces mois' : 'ce mois'} totalisent ${eur(tot)}, mais ${cut.map(P => `pour ${moisLbl(P.k)} seuls ${pct(P.share)} (${eur(P.paid * P.share)} sur ${eur(P.paid)}) sont comptés ici, le reste est attribué à ${P.others.map(o => `« ${esc(o.name)} »`).join(', ')}`).join(' ; ')}.`);
+      if (m.near.length) { const nt = m.near.reduce((a, o) => a + o.mt, 0); why.push(`Des lignes de mission existent juste après, sur ${m.near.map(o => `${moisLbl(o.k)} (${eur(o.mt)} : ${o.src.filter(x => x.kind === 'line').map(x => esc(x.code + ' ' + x.label)).join(', ')})`).join(', ')}, un mois sans mission encodée : elles ne sont pas comptées. Si elles paient cette mission (rattrapage), le total devient ${eur(m.paid + nt)} pour ${eur(m.exp)} attendus${Math.abs(m.paid + nt - m.exp) <= m.tol ? ' : c’est correct' : ''}. Vérifie la période indiquée sur la fiche.`); }
+      if (!cut.length && !m.near.length && Math.abs(tot - m.paid) < 0.01) why.push(`D’où viennent les ${eur(-m.gap)} : toutes les lignes trouvées (${eur(tot)}) sont comptées pour cette mission. Le manque vient donc d’une ligne absente (fiche non importée, ligne classée « Autre » / « Salaire ») ou d’un attendu différent : compare la « rémunération mission brut » d’Heures Mission (${eur(m.exp)}) avec ce que tu attends.`); }
     if (m.per.some(P => !P.src.length)) why.push('Une partie de la mission n’a aucune ligne sur les fiches : vérifie que toutes les fiches concernées sont importées.');
   }
   why.push('Si une ligne de paie de mission est classée « Autre » ou « Salaire », ouvre la fiche et change sa catégorie : le calcul se met à jour.');
@@ -4202,7 +4219,7 @@ function renderBrief(L, M, G){
   for (const m of sorted.slice(0, 6)) { const act = `data-fold="foldGap" data-gopen="${esc(m.id)}"`, nm = `Mission ${esc(m.name)}`;
     let t, sub = `${dFr(m.depart)} → ${dFr(m.retour)}`;
     if (!m.seen) { t = m.st[0] === 'ko' ? `${nm} : pas trouvée sur tes fiches` : `${nm} : en attente de la fiche de paie`; sub += m.st[0] === 'ko' ? ' · à signaler aux RH' : ' · elle apparaît en général sur la fiche du mois suivant'; }
-    else if (m.st[0] === 'ok') { t = `${nm} : bien payée`; sub += m.reg ? ` · + ${h2(m.reg)} h sup régulières en plus` : ''; }
+    else if (m.st[0] === 'ok') { t = `${nm} : bien payée`; if (m.grp && m.grp.ok && Math.abs(m.gap) > m.tol) sub += ` · payée sur la même fiche que ${m.grp.others.map(g => esc(g.name)).join(', ')} (total correct)`; sub += m.reg ? ` · + ${h2(m.reg)} h sup régulières en plus` : ''; }
     else if (m.dH > 0.25 && m.hsExp && m.absH && m.dH - m.absH <= 0.25) { t = `${nm} : ${h2(m.dH)} h sup ont complété ton horaire normal`; sub += ` · ${h2(m.absH)} h non prestées à l’horaire FN ce mois-là, pas d’erreur probable${Math.abs(m.gap) > m.tol ? ` · écart ${eur(m.gap)} brut à vérifier` : ''}`; }
     else if (m.dH > 0.25 && m.hsExp) { t = `${nm} : il manque ${h2(m.dH)} h sup sur tes fiches`; sub += ` · écart ${eur(m.gap)} brut · à signaler aux RH`; }
     else { t = m.gap < 0 ? `${nm} : payée ${eur(-m.gap)} en moins` : `${nm} : payée ${eur(m.gap)} en plus`; sub += m.gap < 0 ? ' · à signaler aux RH' : ' · vérifie avec les RH'; }
