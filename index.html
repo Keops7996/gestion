@@ -1571,7 +1571,7 @@ const Store = {
     this.syncing = true;
     try { const before = JSON.stringify([...this.missions.keys()].sort()) + [...this.missions.values()].map(d => d.updated).sort().join(); await this.syncFolder();
       const after = JSON.stringify([...this.missions.keys()].sort()) + [...this.missions.values()].map(d => d.updated).sort().join();
-      if (before !== after) renderHome(); storeUI(); }
+      if (before !== after) { renderHome(); refreshToolView(); } storeUI(); }
     catch(e) { storeUI('Synchronisation impossible pour le moment : ' + (e.message || e)); }
     finally { this.syncing = false; }
   },
@@ -1783,6 +1783,7 @@ function missionError(){
   return '';
 }
 function go(n){
+  if (n === 'paie' || n === 'paied') { try { flushNow(); } catch(e) {} }   // une mission modifiée juste avant est enregistrée avant d'afficher les fiches
   try { applyPreset(); } catch(e) {}
   if (typeof n === 'number' && n >= 2 && n <= 4) { const err = missionError(); $('[data-err="1"]').textContent = err; if (err) n = 1; }
   if (step === 'note' && n !== 'note') dropEmptyNote();
@@ -2687,6 +2688,10 @@ function armReconnect(){
   document.addEventListener('pointerdown', go1, true); document.addEventListener('keydown', go1, true);
 }
 setInterval(() => { if (!document.hidden) Store.autoSync(); }, 15000);
+// autre onglet / fenêtre de l'app : missions ou profil modifiés → mise à jour immédiate de la vue ouverte (fiches de paie, etc.)
+window.addEventListener('storage', e => { if (Store.mode === 'db') return;
+  if (e.key === KEY_H) { Store.missions = new Map(Object.entries(rd(KEY_H) || {})); renderHome(); refreshToolView(); }
+  else if (e.key === KEY_P) { const p = rd(KEY_P); if (p) { if (p.cfg) st.cfg = p.cfg; for (const c of COLS) if (Array.isArray(p[c])) st[c] = p[c]; Object.assign(st.perso, p.perso || {}); refreshToolView(); } } });
 window.addEventListener('focus', () => Store.autoSync());
 function flushNow(){ if (cfgTimer) { clearTimeout(cfgTimer); cfgTimer = null; Store.saveProfil(); } if (saveTimer && currentId && !missionError()) { clearTimeout(saveTimer); saveTimer = null; const doc = buildDoc(st, currentMeta); currentMeta.created = doc.created; Store.save(currentId, doc); } }
 document.addEventListener('visibilitychange', () => { if (document.hidden) flushNow(); else Store.autoSync(); });
