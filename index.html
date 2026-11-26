@@ -441,6 +441,9 @@ ul.todo{margin:0;padding-left:18px;font-size:13px}ul.todo li{margin:2px 0}
 details.card>summary .tag{margin-left:auto;font-family:var(--f-mono);letter-spacing:0;text-transform:none;font-weight:500}details.card>summary .tag+*{margin-left:0}details.card>summary:has(.tag)::after{margin-left:8px}
 details.card.fold:not([open])>summary{border-bottom:0}
 .howto{margin-top:8px}.howto>summary{cursor:pointer;font-size:13px;color:var(--navy);font-weight:600}.howto>p{margin:6px 0 0}
+.recapgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:720px){.recapgrid{grid-template-columns:1fr}}.hist tr.tot td{border-top:2px solid var(--line)}
+.paiedrop label.keep{display:flex;flex-direction:row;gap:8px;align-items:flex-start;margin-top:8px;font-size:13px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--ink)}.paiedrop label.keep input{width:auto;flex:none;margin:2px 0 0;min-height:0}.keep small{display:inline}
+.recapgrid>.tablebox{min-width:0}.recapgrid table{min-width:0!important;width:100%}.pvbtn{padding:2px 8px;font-size:11px;margin-left:6px;vertical-align:1px}
 .ieset{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:0 0 6px;font-size:13px}.ieset label{display:flex;gap:6px;align-items:center}
 .paiet td{vertical-align:top}.paiet .pst{white-space:normal}
 .gapdet>td>.gaprep{width:0;min-width:100%;box-sizing:border-box}
@@ -705,7 +708,8 @@ details.card.fold:not([open])>summary{border-bottom:0}
     <section class="card">
       <div class="body">
         <div class="paiedrop" id="paieDrop">
-          <div><b>Importer des fiches de paie (PDF)</b><div class="note">Glisse les PDF ici ou choisis-les. Lecture dans l’app, hors ligne : seules les lignes de paie sont gardées (ni n° national, ni adresse, ni compte).</div></div>
+          <div><b>Importer des fiches de paie (PDF)</b><div class="note">Glisse les PDF ici ou choisis-les. Lecture dans l’app, hors ligne : rien n’est envoyé ailleurs.</div>
+            <label class="keep"><input type="checkbox" id="paieKeep" checked><span>Garder le PDF pour le rouvrir et l’imprimer <small class="note">— gardé dans ta db (dossier « paies/pdf », sinon ce navigateur) ; il contient ton n° national, ton adresse et ton compte.</small></span></label></div>
           <button type="button" class="btn" id="paieImpBtn">Choisir des PDF…</button>
           <input type="file" id="paieFile" accept="application/pdf,.pdf" multiple hidden>
         </div>
@@ -718,6 +722,10 @@ details.card.fold:not([open])>summary{border-bottom:0}
       <thead><tr><th>Mois</th><th class="num">Net reçu</th><th class="num">Brut</th><th>Mission payée</th></tr></thead>
       <tbody id="paieBody"></tbody></table></div></section>
     <div class="hometop" style="margin-top:6px"><h2>Détails <span class="note" style="font-weight:400;font-size:13px">pour ceux qui veulent tout vérifier</span></h2></div>
+    <details class="card fold" id="foldRecap" hidden>
+      <summary><span id="recapTitle">Récap de l’année</span> <span class="tag" id="recapTag"></span></summary>
+      <div class="body" id="recapBody"></div>
+    </details>
     <details class="card fold" id="foldGap">
       <summary>Missions : contrôle du paiement <span class="tag" id="paieGapN"></span></summary>
       <div class="body"><p class="note" style="margin:0">Pour chaque mission : les heures sup qui doivent être payées et ce qu’on retrouve sur tes fiches. <b>Clique sur une mission pour l’explication complète.</b></p>
@@ -744,7 +752,7 @@ details.card.fold:not([open])>summary{border-bottom:0}
         <details class="howto"><summary>Comment c’est calculé ?</summary><p class="note">Chaque fiche est comparée au barème en vigueur à sa date (date d’application de l’index), selon ta catégorie, ton âge (méthode SETCa) et ton régime. Salaire avant plan flex = « Rémunération » de la fiche + réductions de salaire du plan flex (leasing voiture, GSM…) reprises dans la communication de la fiche.</p></details>
       </div>
       <div class="tablebox" style="border:0;border-radius:0"><table class="hist paiet">
-        <thead><tr><th>Mois</th><th>Position</th><th class="num">Barème</th><th class="num">Rémunération</th><th class="num">Plan flex</th><th class="num">Avant flex</th><th class="num">Dérive</th><th class="num">%</th></tr></thead>
+        <thead><tr><th>Mois</th><th>Position</th><th class="num">Jours</th><th class="num">Barème</th><th class="num">Rémunération</th><th class="num">Plan flex</th><th class="num">Avant flex</th><th class="num">Dérive</th><th class="num">%</th></tr></thead>
         <tbody id="grBody"></tbody></table></div>
       <div class="body" id="grSum"></div>
       <div class="body" id="grHist" style="padding-top:0"></div>
@@ -757,10 +765,11 @@ details.card.fold:not([open])>summary{border-bottom:0}
     </details>
   </div>
   <div class="page" data-page="paied" hidden>
-    <div class="hometop"><h2 id="pdTitle"></h2><div style="display:flex;gap:8px"><button type="button" class="btn small" id="pdBack">← Mes fiches</button><button type="button" class="btn small" id="pdDel">Supprimer</button></div></div>
+    <div class="hometop"><h2 id="pdTitle"></h2><div style="display:flex;gap:8px"><button type="button" class="btn small" id="pdBack">← Mes fiches</button><button type="button" class="btn small primary" id="pdPdf" hidden>Voir le PDF / Imprimer</button><button type="button" class="btn small" id="pdDel">Supprimer</button></div></div>
     <section class="card"><div class="kpis k4" id="pdKpi"></div></section>
     <section class="card brief"><h2>En bref</h2><div class="body" id="pdBrief"></div></section>
     <details class="card fold" id="pdFoldMis"><summary>Payé ce mois pour tes missions</summary><div class="body" id="pdMis"></div></details>
+    <details class="card fold" id="pdFoldExc"><summary>Jours, absences et primes <span class="tag" id="pdExcTag"></span></summary><div class="body rows" id="pdExc"></div></details>
     <details class="card fold" id="pdFoldBar"><summary>Salaire vs barème</summary><div class="body rows" id="pdBar"></div></details>
     <details class="card fold" id="pdFoldTax"><summary>Impôt et retenues</summary><div class="body rows" id="pdTax"></div></details>
     <details class="card fold"><summary>Toutes les lignes de la fiche <span class="tag">clique sur la catégorie pour la changer</span></summary>
@@ -1050,6 +1059,12 @@ details.card.fold:not([open])>summary{border-bottom:0}
 <div id="imgView" hidden><img alt=""></div>
 
 <div id="printArea" aria-hidden="true"></div>
+<div id="pdfView" class="pdfin" hidden role="dialog" aria-modal="true" aria-labelledby="pvTitle">
+  <div class="pdfbox">
+    <div class="pdfhead"><h2 id="pvTitle">Fiche de paie</h2><span class="note" id="pvName"></span><button type="button" class="btn small primary" id="pvPrint">Imprimer</button><a class="btn small" id="pvDl">Télécharger</a><button type="button" class="btn small" id="pvClose">Fermer</button></div>
+    <iframe id="pvFrame" title="Fiche de paie (PDF)" style="flex:1;width:100%;border:0;background:#525659"></iframe>
+  </div>
+</div>
 <div id="pdfIn" class="pdfin" hidden role="dialog" aria-modal="true" aria-labelledby="pdfTitle">
   <div class="pdfbox">
     <div class="pdfhead"><h2 id="pdfTitle">Feuille de mission PDF</h2><span class="note" id="pdfName"></span><a class="btn small" id="pdfOpen" target="_blank" rel="noopener">Ouvrir en grand</a></div>
@@ -3644,8 +3659,8 @@ if (!Array.isArray(st.paies)) st.paies = [];
 const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const moisLbl = ym => { const [y, m] = String(ym || '').split('-'); return m ? `${MOIS_FR[+m - 1]} ${y}` : '—'; };
 const moisCap = ym => { const s = moisLbl(ym); return s.charAt(0).toUpperCase() + s.slice(1); };
-const PCATS = { mission: 'Mission', hs: 'Heures sup.', recup: 'Récup HS (hors mission)', base: 'Salaire', autre: 'Autre' };
-const PCYCLE = ['mission', 'hs', 'recup', 'base', 'autre'];
+const PCATS = { mission: 'Mission', hs: 'Heures sup.', recup: 'Récup HS (hors mission)', base: 'Salaire', exc: 'Exceptionnel (prime…)', abs: 'Absence / congé', autre: 'Autre' };
+const PCYCLE = ['mission', 'hs', 'recup', 'base', 'exc', 'abs', 'autre'];
 const pnum = s => { s = String(s || '').trim(); if (!/^-?[\d.]*\d(,\d+)?-?$/.test(s)) return null; const neg = s.endsWith('-') || s.startsWith('-'); const v = parseFloat(s.replace(/-/g, '').replace(/\./g, '').replace(',', '.')); return isFinite(v) ? (neg ? -v : v) : null; };
 const pct = x => isFinite(x) ? (x * 100).toLocaleString('fr-BE', { maximumFractionDigits: 1 }) + ' %' : '—';
 let paieId = null, paieYear = '';
@@ -3723,10 +3738,25 @@ function pcat(L){
   const map = (st.cfg && st.cfg.paieMap) || {}, k = normTxt(L.label); if (map[k]) return map[k];
   if (L.sec && L.sec !== 'brut') return 'autre';
   if (/recup.*(hres|heures|h\.)\s*sup|recup.*suppl/.test(k)) return 'recup';        // heures du contingent prises en récupération : hors mission
+  if (isAbs(L)) return 'abs';
   if (/mission|sejour|etranger|expat|allowance|deplacement|grand deplac/.test(k)) return 'mission';
   if (/suppl|\bhs\b|sursalaire|majoration|heures sup|overtime/.test(k)) return 'hs';
+  if (isExc(L)) return 'exc';
   if (/remuneration|salaire|appointement/.test(k)) return 'base';
   return 'autre';
+}
+// entrées / sorties exceptionnelles : primes (ex. 1GR0 Gratification annuelle) et absences (ex. 846H raisons familiales)
+const isExc = L => /gratification|prime|bonus|pecule|13e|treizieme|fin d.annee|participation|cct ?90|eloignement|regularisation|arriere/.test(normTxt(L.label));
+const isAbs = L => L.code === '846H' || /absence|raisons? famil|imperieu|petit chomage|evenement famil|sans solde|conge non|non remun|maladie|chomage|greve|accident|incapacit/.test(normTxt(L.label));
+/* --- jours et heures du mois (partie « Communication ») --- */
+const ouvrM = k => { const [y, m] = k.split('-').map(Number); let n = 0; for (let d = 1, N = new Date(y, m, 0).getDate(); d <= N; d++) { const w = new Date(y, m - 1, d).getDay(); if (w && w < 6) n++; } return n; };
+const hJour = () => num(st.perso.hebdo || 38) / 5;
+function joursOf(k){   // k = mois « aaaa-mm » ; cherche sur toutes les fiches les lignes de communication de cette période
+  const find = re => { for (const p of [...st.paies].sort((a, b) => b.mois.localeCompare(a.mois))) for (const L of p.comm) if (re.test(normTxt(L.label)) && (L.per ? L.per === k : p.mois === k)) { const v = L.j ?? L.h ?? L.mt; if (v != null) return { v, fiche: p.mois }; } return null; };
+  const jp = find(/^(jrs|jours?) prest/), ja = find(/assimil/), ho = find(/heures? ouvr/), ouv = ouvrM(k), hj = hJour();
+  const abs = []; for (const p of st.paies) for (const L of p.lines.concat(p.comm)) if (isAbs(L) && (L.per ? L.per === k : p.mois === k) && (L.h || L.j || L.mt)) abs.push({ ...L, fiche: p.mois, comm: p.comm.includes(L) });
+  const absH = abs.filter(L => !L.comm || !abs.some(o => !o.comm && normTxt(o.label) === normTxt(L.label))).reduce((s, L) => s + (L.h || (L.j || 0) * hj), 0);
+  return { k, jp, ja, ho, ouv, hj, hth: ouv * hj, abs, absH };
 }
 const isPrec = L => L.code === '/410' || /precompte/.test(normTxt(L.label));
 const isOnss = L => L.code === '/300' || /cotisation onss/.test(normTxt(L.label));
@@ -3772,7 +3802,8 @@ function gapCalc(){
     m.age = (Date.now() - new Date(m.retour + 'T12:00')) / 864e5;
     m.st = !m.seen ? (m.age < 75 ? ['wa', 'En attente'] : ['ko', 'Non trouvé sur les fiches']) : Math.abs(m.gap) <= m.tol ? ['ok', 'OK'] : m.gap < 0 ? ['ko', 'Payé en moins'] : ['wa', 'Payé en plus'];
     m.reg = m.seen && m.dH < -0.25 ? -m.dH : 0;           // surplus d'heures = heures sup régulières (hors mission)
-    if (m.seen && m.hsExp && m.dH > 0.25) m.st = ['ko', `${h2(m.dH)} h sup de mission manquantes`];
+    m.J = m.per.map(P => joursOf(P.k)); m.absH = m.J.reduce((s, J, i) => s + J.absH * m.per[i].hshare, 0);
+    if (m.seen && m.hsExp && m.dH > 0.25) m.st = m.absH && m.dH - m.absH <= 0.25 ? ['wa', `Écart expliqué par ${h2(m.absH)} h d’absence`] : ['ko', `${h2(m.dH)} h sup de mission manquantes`];
     else if (m.reg) m.st = m.st[0] === 'ok' ? ['ok', `OK · + ${h2(m.reg)} h sup régulières`] : m.gap > 0 ? ['wa', `Payé en plus · ${h2(m.reg)} h sup régulières ?`] : [m.st[0], `${m.st[1]} · + ${h2(m.reg)} h sup régulières`]; }
   const orph = Object.keys(paid).filter(k => !M.some(m => m.months[k]) && Math.abs(paid[k]) > 0.005).sort().reverse().map(k => ({ k, mt: paid[k] }));
   return { M, orph };
@@ -3800,6 +3831,8 @@ function gapReport(m){
     h += `<p class="note" style="margin:6px 0 0">Total ${moisLbl(P.k)} : ${eur(P.paid)} · ${h2(P.paidH)} h`;
     if (P.others.length) h += ` — partagé avec ${P.others.map(o => `« ${esc(o.name)} »`).join(', ')} : part de cette mission = ${pct(P.share)} des montants et ${pct(P.hshare)} des heures (au prorata de l’attendu)`;
     h += `.</p></div>`; }
+  h += `<h4>Jours et heures du mois <small class="note">(partie « Communication » des fiches)</small></h4>`;
+  for (const J of m.J) h += `<div class="pmis"><h5>${moisCap(J.k)}</h5>${joursDl(J)}</div>`;
   h += `<h4>3 · Le calcul</h4>` + dl([
     ['Heures sup payées sur les fiches', `${m.per.map(P => h2(P.paidH * P.hshare)).join(' + ')} = <b>${h2(m.paidH)} h</b>`],
     ['Heures sup attendues <small>prestées − horaire FN, part payée</small>', `<b>${h2(m.hsExp)} h</b>`],
@@ -3816,8 +3849,9 @@ function gapReport(m){
         if (m.gap > m.tol) why.push(`Le brut payé en plus (${eur(m.gap)}) peut correspondre au paiement de ces ${h2(m.reg)} h régulières s’il est sur la même ligne que la mission.`);
         if (near(m.paidH, m.paidC)) why.push(`${h2(m.paidH)} h = tes heures payées après coefficient (${h2(m.paidC)} h) : la fiche compte les heures × coefficient, pas seulement les heures au-delà de l’horaire FN.`);
         else if (m.rec && near(m.paidH, raw)) why.push(`${h2(m.paidH)} h = toutes tes heures au-delà de l’horaire FN (${h2(raw)} h) : la fiche paie aussi la part mise en récupération.`); }
-      else { why.push(`<b>Anomalie :</b> les fiches doivent contenir au minimum les ${h2(m.hsExp)} h sup de la mission, or il en manque ${h2(m.dH)} h.`);
-      }
+      else if (m.absH && m.dH - m.absH <= 0.25) why.push(`Il manque ${h2(m.dH)} h sup, mais tu as ${h2(m.absH)} h d’absence le même mois (${m.J.flatMap(J => J.abs).map(L => esc(L.code ? L.code + ' ' + L.label : L.label)).filter((v, i, a) => a.indexOf(v) === i).join(', ')}) : les heures sup de mission ont d’abord compensé ces heures non prestées. Ce n’est probablement pas une erreur ; vérifie-le avec les RH si besoin.`);
+      else { why.push(`<b>Anomalie :</b> les fiches doivent contenir au minimum les ${h2(m.hsExp)} h sup de la mission, or il en manque ${h2(m.dH)} h${m.absH ? ` (dont ${h2(m.absH)} h peuvent s’expliquer par une absence le même mois)` : ''}.`);
+        const dh = m.J.filter(J => J.ho && J.ho.v < J.hth - 0.25); if (dh.length) why.push(`Heures ouvrées sur la fiche : ${dh.map(J => `${moisLbl(J.k)} ${h2(J.ho.v)} h pour ${h2(J.hth)} h théoriques (${J.ouv} j × ${h2(J.hj)} h)`).join(', ')}. Si ce mois a eu des heures non prestées, les heures sup peuvent d’abord les compenser : à vérifier avec les RH.`); }
       if (m.per.some(P => P.src.some(o => o.kind === 'comm' && o.countH))) why.push('Les heures viennent surtout de la ligne « HS avec réduction fiscale » de la communication : elle ne reprend que les heures qui ont droit à la réduction fiscale (contingent limité), pas forcément toutes les heures payées.');
       if (m.dH > 0 && Math.abs(m.gap) <= m.tol) why.push('Les euros concordent pourtant : vérifie si la fiche compte les heures autrement (sans coefficient, ou seulement celles avec réduction fiscale) avant de réclamer.'); }
     if (m.per.some(P => !P.src.length)) why.push('Une partie de la mission n’a aucune ligne sur les fiches : vérifie que toutes les fiches concernées sont importées.');
@@ -3826,16 +3860,80 @@ function gapReport(m){
   h += `<h4>4 · Pourquoi ce résultat</h4><ul class="gapwhy">${why.map(w => `<li>${w}</li>`).join('')}</ul></div>`;
   return h;
 }
+function joursDl(J){
+  const r = [['Jours ouvrables du mois <small>lundi → vendredi</small>', `${J.ouv} j`],
+    ['Jours prestés ou rémunérés', J.jp ? `<b>${h2(J.jp.v)} j</b>${J.jp.v < J.ouv - 0.01 ? ` <span class="mark">${h2(J.ouv - J.jp.v)} j non rémunérés</span>` : ''}` : '<span class="note">pas sur les fiches importées</span>'],
+    ['Jours assimilés <small>maladie, chômage… payés par un autre organisme</small>', J.ja ? `${h2(J.ja.v)} j` : '—'],
+    ['Heures ouvrées', J.ho ? `${h2(J.ho.v)} h <small class="note">(théorique ${J.ouv} j × ${h2(J.hj)} h = ${h2(J.hth)} h${Math.abs(J.ho.v - J.hth) > 0.25 ? ` · écart ${h2(J.ho.v - J.hth)} h` : ''})</small>` : '—']];
+  for (const L of J.abs) r.push([`<span class="mark">Absence</span> ${esc(L.code)} ${esc(L.label)}${L.comm ? ' <small>(communication)</small>' : ''}`, [L.h ? h2(L.h) + ' h' : '', L.j ? h2(L.j) + ' j' : '', L.mt ? eur(L.mt) : ''].filter(Boolean).join(' · ')]);
+  return `<dl>${r.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
+}
+/* --- récap annuel : ce qui entre (IN) et ce qui sort (OUT) --- */
+function recapYear(y){
+  const P = st.paies.filter(p => p.mois.startsWith(y)).sort((a, b) => a.mois.localeCompare(b.mois)), IN = {}, OUT = {}, ex = [];
+  const add = (o, k, v) => { o[k] = (o[k] || 0) + v; };
+  const LIN = { base: 'Salaire', mission: 'Missions et heures sup', hs: 'Missions et heures sup', recup: 'Récupération d’heures sup', exc: 'Primes et entrées exceptionnelles', abs: 'Absences payées', autre: 'Avantages en nature et autres' };
+  let net = 0;
+  for (const p of P) { net += p.tot.net || 0;
+    for (const L of p.lines) { const v = L.mt || 0, c = L.sec === 'brut' ? pcat(L) : '';
+      if (c === 'exc' || c === 'abs') ex.push({ mois: p.mois, c, L });
+      if (L.sec === 'brut') { if (v >= 0) add(IN, LIN[c], v); else add(OUT, c === 'abs' ? 'Absences non payées' : 'Autres retenues sur le brut', -v); }
+      else if (isOnss(L) || /onss/.test(normTxt(L.label))) add(OUT, 'Cotisations ONSS', -v);
+      else if (isPrec(L)) add(OUT, 'Précompte (impôt)', -v);
+      else add(OUT, 'Chèques repas, avantages récupérés, autres', -v); } }
+  for (const o of [IN, OUT]) for (const k of Object.keys(o)) if (Math.abs(o[k]) < 0.005) delete o[k];
+  const tIn = Object.values(IN).reduce((a, b) => a + b, 0), tOut = Object.values(OUT).reduce((a, b) => a + b, 0);
+  return { y, P, IN, OUT, tIn, tOut, net, ex };
+}
+function renderRecap(){
+  const ys = [...new Set(st.paies.map(p => p.mois.slice(0, 4)))].sort(), y = paieYear && paieYear !== 'all' ? paieYear : ys[ys.length - 1];
+  const el = $('#foldRecap'); el.hidden = !y; if (!y) return null; const R = recapYear(y);
+  $('#recapTitle').textContent = `Récap de l’année ${y}`; $('#recapTag').textContent = `${R.P.length} fiche${R.P.length > 1 ? 's' : ''} sur 12`;
+  const tb = (o, t) => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${k}</td><td class="num">${eur(v)}</td><td class="num">${t ? pct(v / t) : ''}</td></tr>`).join('');
+  const miss = []; for (let m = 1; m <= 12; m++) { const k = `${y}-${String(m).padStart(2, '0')}`; if (!R.P.some(p => p.mois === k) && k <= todayIso().slice(0, 7)) miss.push(MOIS_FR[m - 1]); }
+  $('#recapBody').innerHTML = `<div class="kpis k4" style="margin-bottom:12px">${[['Entrées (IN)', eur(R.tIn)], ['Sorties (OUT)', eur(R.tOut)], ['Net versé', eur(R.net)], ['Net / brut', pct(R.tIn ? R.net / R.tIn : NaN)]].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
+    <div class="recapgrid"><div class="tablebox"><table class="hist"><thead><tr><th>IN · ce qui entre (brut)</th><th class="num">Montant</th><th class="num">%</th></tr></thead><tbody>${tb(R.IN, R.tIn)}<tr class="tot"><td><b>Total IN</b></td><td class="num"><b>${eur(R.tIn)}</b></td><td></td></tr></tbody></table></div>
+    <div class="tablebox"><table class="hist"><thead><tr><th>OUT · ce qui sort</th><th class="num">Montant</th><th class="num">%</th></tr></thead><tbody>${tb(R.OUT, R.tIn)}<tr class="tot"><td><b>Total OUT</b></td><td class="num"><b>${eur(R.tOut)}</b></td><td></td></tr></tbody></table></div></div>
+    <h3 class="lbl" style="margin:14px 0 6px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;font-size:12px">Entrées et sorties exceptionnelles</h3>
+    ${R.ex.length ? `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Mois</th><th>Ligne</th><th class="num">Heures / jours</th><th class="num">Montant</th></tr></thead><tbody>${R.ex.map(o => `<tr><td>${moisCap(o.mois)}</td><td><span class="pst ${o.c === 'exc' ? 'ok' : 'wa'}">${o.c === 'exc' ? 'IN' : (o.L.mt || 0) < 0 ? 'OUT' : 'absence'}</span> ${esc(o.L.code)} ${esc(o.L.label)}${o.L.per && o.L.per !== o.mois ? ` <small class="note">(${moisLbl(o.L.per)})</small>` : ''}</td><td class="num">${[o.L.h ? h2(o.L.h) + ' h' : '', o.L.j ? h2(o.L.j) + ' j' : ''].filter(Boolean).join(' · ') || '—'}</td><td class="num">${o.L.mt ? sgn(o.L.mt) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="note" style="margin:0">Aucune prime ni absence sur les fiches de cette année.</p>'}
+    <p class="note" style="margin:10px 0 0">IN = toutes les lignes positives du brut (le brut ONSS de chaque fiche). OUT = cotisations, précompte et retenues ; IN − OUT = net versé. Les avantages en nature (GSM, voiture…) sont ajoutés au brut puis récupérés : ils apparaissent des deux côtés.${miss.length ? ` <b>Fiches manquantes : ${miss.join(', ')}</b> — importe-les pour un récap complet.` : ''}</p>`;
+  return { R, miss };
+}
 const misOfMonth = k => misList().filter(m => m.months[k]);
+
+/* --- PDF original de la fiche : gardé seulement chez toi (dossier db/paies/pdf, sinon ce navigateur) --- */
+const PdfStore = {
+  async dir(create){ const d = await FS.cdir('paies'); return d.getDirectoryHandle('pdf', create ? { create: true } : undefined); },
+  async idbDo(mode, f){ const db = await FS.idb(); return new Promise((res, rej) => { const t = db.transaction('h', mode), q = f(t.objectStore('h')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }); },
+  async put(id, buf){ const blob = new Blob([buf], { type: 'application/pdf' });
+    if (FS.dir) { const fh = await (await this.dir(true)).getFileHandle(id + '.pdf', { create: true }), w = await fh.createWritable(); await w.write(blob); await w.close(); return; }
+    await this.idbDo('readwrite', o => o.put(blob, 'pdf:' + id)); },
+  async get(id){ if (FS.dir) { try { return await (await (await this.dir()).getFileHandle(id + '.pdf')).getFile(); } catch(e) {} }
+    try { return (await this.idbDo('readonly', o => o.get('pdf:' + id))) || null; } catch(e) { return null; } },
+  async del(id){ if (FS.dir) { try { await (await this.dir()).removeEntry(id + '.pdf'); } catch(e) {} } try { await this.idbDo('readwrite', o => o.delete('pdf:' + id)); } catch(e) {} }
+};
+let pvUrl = null;
+async function pdfView(id){ const p = st.paies.find(x => x.id === id); if (!p) return; const b = await PdfStore.get(id);
+  if (!b) { undoToast(`PDF de ${moisLbl(p.mois)} non conservé : réimporte la fiche (case « Garder le PDF » cochée) pour pouvoir l’ouvrir.`); return; }
+  if (pvUrl) URL.revokeObjectURL(pvUrl); pvUrl = URL.createObjectURL(b.type === 'application/pdf' ? b : new Blob([b], { type: 'application/pdf' }));
+  $('#pvTitle').textContent = moisCap(p.mois); $('#pvName').textContent = p.fichier || '';
+  $('#pvFrame').src = pvUrl; $('#pvDl').href = pvUrl; $('#pvDl').download = p.fichier || `Fiche de paie ${p.mois}.pdf`; $('#pdfView').hidden = false; $('#pvClose').focus(); }
+function pvClose(){ $('#pdfView').hidden = true; $('#pvFrame').src = 'about:blank'; }
+$('#pvClose').addEventListener('click', pvClose);
+$('#pdfView').addEventListener('keydown', e => { if (e.key === 'Escape') pvClose(); });
+$('#pvPrint').addEventListener('click', () => { try { $('#pvFrame').contentWindow.focus(); $('#pvFrame').contentWindow.print(); } catch(e) { window.open(pvUrl, '_blank'); } });
+$('#paieKeep').checked = st.perso.keepPdf !== false;
+$('#paieKeep').addEventListener('change', e => { st.perso.keepPdf = e.target.checked; Store.saveProfil(); });
 
 /* --- import --- */
 async function paieImport(files){
   const msg = []; let ok = 0;
   for (const f of files) {
     if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') { msg.push(`${esc(f.name)} : pas un PDF.`); continue; }
-    try { const P = parsePaie(await pdfTextItems(await f.arrayBuffer()));
+    try { const buf = await f.arrayBuffer(), P = parsePaie(await pdfTextItems(buf));
       const id = 'p' + P.mois.replace('-', ''), now = new Date().toISOString(), cur = st.paies.find(p => p.id === id);
       const rec = { id, mois: P.mois, lines: P.lines, comm: P.comm, tot: P.tot, info: P.info, fichier: f.name, created: cur ? cur.created : now, updated: now };
+      if (st.perso.keepPdf !== false) { try { await PdfStore.put(id, buf); rec.pdf = true; } catch(e) { rec.pdf = false; msg.push(`${esc(f.name)} : lu, mais le PDF n’a pas pu être gardé.`); } }
       if (cur) Object.assign(cur, rec); else st.paies.push(rec); ok++;
     } catch(e) { msg.push(`${esc(f.name)} : ${e.message === 'format' || e.message === 'vide' ? 'fiche non reconnue (PDF scanné ou autre modèle ?)' : 'lecture impossible'}.`); }
   }
@@ -3893,8 +3991,14 @@ function baremeOf(p){
   const bar = Math.round(full * regime) / 100;
   const base = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'base').reduce((s, L) => s + (L.mt || 0), 0);
   const flexL = p.comm.filter(L => /^red\.?\s*sal/.test(normTxt(L.label)) && L.mt), flex = -flexL.reduce((s, L) => s + L.mt, 0);
-  const theo = base + flex;
-  return { g, classe, regime, age: ageTxt, how, bar, base, flexL, flex, theo, d: theo - bar, dp: bar ? (theo - bar) / bar : NaN };
+  const J = joursOf(p.mois), f = J.jp && J.jp.v < J.ouv - 0.01 ? J.jp.v / J.ouv : 1;
+  const absL = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'abs' && L.mt), absMt = absL.reduce((s, L) => s + L.mt, 0);
+  // la fiche peut soit réduire la rémunération au prorata des jours, soit garder le mois complet et ajouter une ligne d'absence : on retient la lecture qui colle
+  const C = absMt ? [{ abs: absMt, f: 1, m: 'mois complet − ligne d’absence' }].concat(f < 1 ? [{ abs: absMt, f, m: 'ligne d’absence et prorata des jours' }] : [])
+    : [{ abs: 0, f, m: f < 1 ? 'rémunération au prorata des jours' : 'mois complet' }];
+  const pick = C.map(c => ({ ...c, theo: base + flex + c.abs, att: Math.round(bar * c.f * 100) / 100 })).reduce((a, b) => Math.abs(b.theo - b.att) < Math.abs(a.theo - a.att) - 0.005 ? b : a);
+  const theo = pick.theo, att = pick.att;
+  return { g, classe, regime, age: ageTxt, how, bar, att, f: pick.f, fJ: f, J, absL, absMt: pick.abs, meth: pick.m, base, flexL, flex, theo, d: theo - att, dp: att ? (theo - att) / att : NaN };
 }
 async function parseGrilleXlsx(buf){
   const z = await JSZip.loadAsync(buf), rd = async n => { const f = z.file(n); return f ? f.async('string') : ''; };
@@ -3954,10 +4058,10 @@ function renderGrille(L){
   const cat = (lastP && lastP.info && lastP.info.statut) || '';
   $('#grPos').innerHTML = `Catégorie : <b>${cat ? esc(cat) : '—'}</b> <small>(statut de la fiche)</small> · Régime : <b>${REGS[+(st.perso.regime || 100)]}</b> · Naissance : <b>${st.perso.naiss ? dFr(st.perso.naiss) : 'à indiquer'}</b> <small>(profil, page principale)</small>`;
   const rows = L.map(p => ({ p, b: baremeOf(p) }));
-  $('#grBody').innerHTML = !G.length ? `<tr><td colspan="8" class="note" style="padding:16px">Charge le barème (PDF) pour comparer tes fiches.</td></tr>`
-    : rows.map(({ p, b }) => b.err ? `<tr><td><b>${moisCap(p.mois)}</b></td><td colspan="7" class="note">${esc(b.err)}</td></tr>`
-      : `<tr data-pid="${esc(p.id)}"><td><b>${moisCap(p.mois)}</b><span class="sub">barème ${dFr(b.g.date)}</span></td><td>${b.classe} · ${b.age}${b.regime !== 100 ? ' · ' + REGS[b.regime] : ''}</td><td class="num">${eur(b.bar)}</td><td class="num">${eur(b.base)}</td><td class="num">${b.flex ? '+ ' + eur(b.flex) : '—'}</td><td class="num"><b>${eur(b.theo)}</b></td><td class="num">${sgn(b.d)}</td><td class="num">${pct(b.dp)}</td></tr>`).join('')
-      || `<tr><td colspan="8" class="note" style="padding:16px">Aucune fiche pour cette période.</td></tr>`;
+  $('#grBody').innerHTML = !G.length ? `<tr><td colspan="9" class="note" style="padding:16px">Charge le barème (PDF) pour comparer tes fiches.</td></tr>`
+    : rows.map(({ p, b }) => b.err ? `<tr><td><b>${moisCap(p.mois)}</b></td><td colspan="8" class="note">${esc(b.err)}</td></tr>`
+      : `<tr data-pid="${esc(p.id)}"><td><b>${moisCap(p.mois)}</b><span class="sub">barème ${dFr(b.g.date)}</span></td><td>${b.classe} · ${b.age}${b.regime !== 100 ? ' · ' + REGS[b.regime] : ''}</td><td class="num">${b.J.jp ? `${h2(b.J.jp.v)} / ${b.J.ouv} j` : `— / ${b.J.ouv} j`}${b.J.ja ? `<span class="sub">+ ${h2(b.J.ja.v)} j assimilés</span>` : ''}</td><td class="num">${eur(b.att)}${b.f < 1 ? `<span class="sub">plein : ${eur(b.bar)}</span>` : ''}</td><td class="num">${eur(b.base)}${b.absMt ? `<span class="sub">absence ${eur(b.absMt)}</span>` : ''}</td><td class="num">${b.flex ? '+ ' + eur(b.flex) : '—'}</td><td class="num"><b>${eur(b.theo)}</b></td><td class="num">${sgn(b.d)}</td><td class="num">${pct(b.dp)}</td></tr>`).join('')
+      || `<tr><td colspan="9" class="note" style="padding:16px">Aucune fiche pour cette période.</td></tr>`;
   const ok = rows.filter(r => !r.b.err); let s = '';
   if (ok.length) { const ko = ok.filter(r => Math.abs(r.b.d) > 1); const sous = ko.filter(r => r.b.d < 0).length, sur = ko.length - sous; s = ko.length ? `<div class="warn"><b>${[sous && `${sous} mois sous le barème`, sur && `${sur} mois au-dessus`].filter(Boolean).join(', ')}.</b> Dérive moyenne : ${eur(ko.reduce((t, r) => t + r.b.d, 0) / ko.length)} / mois, cumul ${eur(ko.reduce((t, r) => t + r.b.d, 0))}.</div>` : `<div class="note">Toutes les fiches correspondent au barème (± 1 €).</div>`; }
   $('#grSum').innerHTML = s;
@@ -4070,11 +4174,11 @@ const sgn = (x, cls = true) => `<span class="${cls ? (x < -0.005 ? 'pneg' : x > 
 /* --- résumé simple (« En bref ») : une phrase par sujet, le détail en cliquant --- */
 const stLbl = m => m.st[1].replace(/^OK/, 'Bien payée').replace(/^En attente$/, 'En attente de la fiche');
 const bLine = (c, ico, t, sub, act, go) => `<div class="bline" role="button" tabindex="0" ${act}><span class="bico ${c}" aria-hidden="true">${ico}</span><span class="btx"><b>${t}</b>${sub ? `<small>${sub}</small>` : ''}</span><span class="bgo">${go || 'Détail ›'}</span></div>`;
-const ICO = { ok: '✓', wa: '!', ko: '✕', in: '€' };
+const ICO = { ok: '✓', wa: '!', ko: '✕', in: '€' }; let recapInfo = null, pdOpenFold = '';
 function briefBar(p){ const b = baremeOf(p), act = 'data-fold="foldBar"';
   if (!grilles().length) return bLine('wa', ICO.wa, 'Salaire pas encore vérifié', 'Charge le barème SETCa pour comparer ton salaire.', act, 'Charger ›');
   if (b.err) return bLine('wa', ICO.wa, 'Salaire pas encore vérifié', esc(b.err), act);
-  const sub = `Catégorie ${b.classe} · barème du ${dFr(b.g.date)}`;
+  const sub = `Catégorie ${b.classe} · barème du ${dFr(b.g.date)}${b.f < 1 ? ` · ${h2(b.J.jp.v)}/${b.J.ouv} jours rémunérés (barème au prorata : ${eur(b.att)})` : b.absMt ? ' · absence déduite' : ''}`;
   return Math.abs(b.d) <= 1 ? bLine('ok', ICO.ok, 'Ton salaire correspond au barème', sub, act)
     : b.d < 0 ? bLine('ko', ICO.ko, `Ton salaire est ${eur(-b.d)} sous le barème (par mois)`, sub + ' · à signaler aux RH', act)
     : bLine('ok', ICO.ok, `Ton salaire est ${eur(b.d)} au-dessus du barème`, sub, act); }
@@ -4087,12 +4191,18 @@ function renderBrief(L, M, G){
     let t, sub = `${dFr(m.depart)} → ${dFr(m.retour)}`;
     if (!m.seen) { t = m.st[0] === 'ko' ? `${nm} : pas trouvée sur tes fiches` : `${nm} : en attente de la fiche de paie`; sub += m.st[0] === 'ko' ? ' · à signaler aux RH' : ' · elle apparaît en général sur la fiche du mois suivant'; }
     else if (m.st[0] === 'ok') { t = `${nm} : bien payée`; sub += m.reg ? ` · + ${h2(m.reg)} h sup régulières en plus` : ''; }
+    else if (m.dH > 0.25 && m.hsExp && m.absH && m.dH - m.absH <= 0.25) { t = `${nm} : ${h2(m.dH)} h sup compensées par ton absence`; sub += ` · ${h2(m.absH)} h d’absence le même mois, pas d’erreur probable${Math.abs(m.gap) > m.tol ? ` · écart ${eur(m.gap)} brut à vérifier` : ''}`; }
     else if (m.dH > 0.25 && m.hsExp) { t = `${nm} : il manque ${h2(m.dH)} h sup sur tes fiches`; sub += ` · écart ${eur(m.gap)} brut · à signaler aux RH`; }
     else { t = m.gap < 0 ? `${nm} : payée ${eur(-m.gap)} en moins` : `${nm} : payée ${eur(m.gap)} en plus`; sub += m.gap < 0 ? ' · à signaler aux RH' : ' · vérifie avec les RH'; }
     if (m.rec) sub += ` · ${h2(m.rec)} h à récupérer`;
     out.push(bLine(m.st[0], ICO[m.st[0]], t, sub, act)); }
   if (sorted.length > 6) out.push(bLine('in', '…', `${sorted.length - 6} autre${sorted.length - 6 > 1 ? 's' : ''} mission${sorted.length - 6 > 1 ? 's' : ''}`, '', 'data-fold="foldGap"', 'Voir ›'));
   if (G.orph.length) out.push(bLine('wa', ICO.wa, 'Paiement de mission sans mission encodée', G.orph.map(o => `${moisLbl(o.k)} (${eur(o.mt)})`).join(', ') + ' · encode la mission dans Heures Mission', 'data-fold="foldGap"'));
+  { const P = st.paies.filter(p => paieYear === 'all' || !paieYear || p.mois.startsWith(paieYear)).sort((a, b) => b.mois.localeCompare(a.mois)).slice(0, 12);
+    for (const p of P) { const E = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'exc'), A = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'abs');
+      if (E.length) out.push(bLine('in', '+', `${moisCap(p.mois)} : ${E.map(L => esc(L.label)).join(', ')} ${E.length === 1 ? eur(E[0].mt || 0) : ''}`.trim(), `Entrée exceptionnelle${E.length > 1 ? 's' : ''} : ${eur(E.reduce((s, L) => s + (L.mt || 0), 0))} brut · non comparée au barème`, `data-pid="${esc(p.id)}" data-pfold="pdFoldExc"`, 'Voir ›'));
+      if (A.length) out.push(bLine('wa', '−', `${moisCap(p.mois)} : absence — ${A.map(L => esc(L.label)).join(', ')}`, A.map(L => [L.per && L.per !== p.mois ? 'période ' + moisLbl(L.per) : '', L.h ? h2(L.h) + ' h' : '', L.j ? h2(L.j) + ' j' : '', L.mt ? eur(L.mt) : ''].filter(Boolean).join(' · ')).join(' ; ') + ' · pris en compte dans les contrôles', `data-pid="${esc(p.id)}" data-pfold="pdFoldExc"`, 'Voir ›')); } }
+  if (recapInfo) { const { R, miss } = recapInfo; out.push(bLine('in', 'Σ', `Récap ${R.y} : ${eur(R.net)} net reçus`, `Entrées ${eur(R.tIn)} · sorties ${eur(R.tOut)} (impôt ${eur(R.OUT['Précompte (impôt)'] || 0)}, ONSS ${eur(R.OUT['Cotisations ONSS'] || 0)})${miss.length ? ` · ${miss.length} fiche${miss.length > 1 ? 's' : ''} manquante${miss.length > 1 ? 's' : ''}` : ''}`, 'data-fold="foldRecap"', 'Récap ›')); }
   const I = st.cfg && st.cfg.policy && st.cfg.policy.ie;
   if (!I) out.push(bLine('wa', ICO.wa, 'Indemnité d’éloignement : pas d’estimation', 'Charge la politique voyage (fichier) pour l’estimer.', 'data-fold="foldPol"', 'Charger ›'));
   else { const r = ieRes.filter(x => paieYear === 'all' || x.y === paieYear)[0]; const nm = I.label || 'Indemnité d’éloignement';
@@ -4104,7 +4214,7 @@ function renderBrief(L, M, G){
   $('#paieBrief').innerHTML = out.join('');
 }
 function briefGo(e){ const el = e.target.closest('.bline'); if (!el) return; if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return; if (e.type === 'keydown') e.preventDefault();
-  if (el.dataset.pid) { paieId = el.dataset.pid; go('paied'); return; }
+  if (el.dataset.pid) { paieId = el.dataset.pid; pdOpenFold = el.dataset.pfold || ''; go('paied'); return; }
   if (el.dataset.pick) { $('#paieFile').click(); return; }
   if (el.dataset.gopen) gapOpen.add(el.dataset.gopen);
   if (el.dataset.ieopen) ieOpen.add(el.dataset.ieopen);
@@ -4122,7 +4232,7 @@ function renderPAIE(){
   $('#paieCount').textContent = st.paies.length ? `${L.length} fiche${L.length > 1 ? 's' : ''}` : '';
   $('#paieBody').innerHTML = L.map(p => { const c = paieCalc(p), pers = [...new Set(c.mis.map(x => x.per || p.mois))].sort();
     const who = pers.map(k => { const ms = misOfMonth(k); return ms.length ? ms.map(m => esc(m.name)).join(', ') + ` <small class="note">(${moisLbl(k)})</small>` : `<small class="note">${moisLbl(k)} — aucune mission encodée</small>`; }).join('<br>');
-    return `<tr data-pid="${esc(p.id)}" title="Ouvrir la fiche"><td><b>${moisCap(p.mois)}</b></td><td class="num"><b>${eur(c.net)}</b></td><td class="num">${eur(c.brut)}</td><td>${who ? who + (c.misMt ? ` <small class="note">· ${eur(c.misMt)}</small>` : '') : '<span class="note">—</span>'}</td></tr>`; }).join('')
+    return `<tr data-pid="${esc(p.id)}" title="Ouvrir la fiche"><td><b>${moisCap(p.mois)}</b>${p.pdf ? ` <button type="button" class="btn small pvbtn" data-pv="${esc(p.id)}" title="Ouvrir le PDF (impression possible)">PDF</button>` : ''}</td><td class="num"><b>${eur(c.net)}</b></td><td class="num">${eur(c.brut)}</td><td>${who ? who + (c.misMt ? ` <small class="note">· ${eur(c.misMt)}</small>` : '') : '<span class="note">—</span>'}</td></tr>`; }).join('')
     || `<tr><td colspan="4" class="note" style="padding:16px">Aucune fiche pour l’instant : importe un PDF ci-dessus.</td></tr>`;
   const G = gapCalc(), M = G.M.filter(m => paieYear === 'all' || m.depart.startsWith(paieYear) || m.retour.startsWith(paieYear));
   const nko = M.filter(m => m.st[0] !== 'ok').length; $('#paieGapN').textContent = M.length ? (nko ? `${nko} à vérifier` : 'tout est OK') : '';
@@ -4133,18 +4243,19 @@ function renderPAIE(){
   renderGrille(L);
   renderIE();
   renderPol();
+  recapInfo = renderRecap();
   renderBrief(L, M, G);
   autoLabel($('[data-page=paie]'));
 }
 $('#paieGap').addEventListener('click', e => { const tr = e.target.closest('tr[data-gid]'); if (!tr) return; const id = tr.dataset.gid; gapOpen.has(id) ? gapOpen.delete(id) : gapOpen.add(id); renderPAIE(); });
 $('#paieYear').addEventListener('change', e => { paieYear = e.target.value; renderPAIE(); });
 $('#grBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-pid]'); if (!tr) return; paieId = tr.dataset.pid; go('paied'); });
-$('#paieBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-pid]'); if (!tr) return; paieId = tr.dataset.pid; go('paied'); });
+$('#paieBody').addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (b) { e.stopPropagation(); pdfView(b.dataset.pv); return; } const tr = e.target.closest('tr[data-pid]'); if (!tr) return; paieId = tr.dataset.pid; go('paied'); });
 
 function renderPAIED(){
   const p = st.paies.find(x => x.id === paieId); if (!p) { go('paie'); return; }
   const c = paieCalc(p), R = paieRef(p);
-  $('#pdTitle').textContent = 'Fiche de paie — ' + moisLbl(p.mois);
+  $('#pdTitle').textContent = 'Fiche de paie — ' + moisLbl(p.mois); $('#pdPdf').hidden = !p.pdf;
   $('#pdKpi').innerHTML = [['Net reçu', eur(c.net)], ['Brut', eur(c.brut)], [`Impôt retenu (${pct(c.tx)})`, eur(c.prec)], ['Imposable', eur(c.imp)]].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
   const per = {}; for (const L of c.mis) (per[L.per || p.mois] = per[L.per || p.mois] || []).push(L);
   $('#pdMis').innerHTML = Object.keys(per).sort().map(k => { const ms = misOfMonth(k), tot = per[k].reduce((s, L) => s + (L.mt || 0), 0);
@@ -4163,15 +4274,25 @@ function renderPAIED(){
       ['Écart réel − hypothèse', sgn((dN / dB - appNet) * dB, true) + ` <small class="note">(${pct(dN / dB - appNet)})</small>`]); }
     $('#pdTax').innerHTML = `<dl>${rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>` + (R ? '' : '<p class="note" style="margin:10px 0 0">Importe aussi une fiche d’un mois sans mission : l’app calculera alors l’impôt réellement prélevé sur la part mission / HS et l’écart avec l’hypothèse de l’app (66 % ou 45 % de net).</p>');
   { const b = baremeOf(p); $('#pdBar').innerHTML = b.err ? `<p class="note" style="margin:0">${esc(b.err)} Renseigne ta position dans « Barème salarial » (Mes fiches).</p>`
-    : `<dl>${[[`Barème ${dFr(b.g.date)} <small>catégorie ${b.classe} · ${b.age} · ${REGS[b.regime]}</small>`, eur(b.bar)], [`<small>Calcul SETCa : ${b.how}${b.regime !== 100 ? ' × ' + b.regime + ' %' : ''}</small>`, ''], ['Rémunération sur la fiche', eur(b.base)],
+    : `<dl>${[[`Barème ${dFr(b.g.date)} <small>catégorie ${b.classe} · ${b.age} · ${REGS[b.regime]}</small>`, eur(b.bar)], [`<small>Calcul SETCa : ${b.how}${b.regime !== 100 ? ' × ' + b.regime + ' %' : ''}</small>`, ''], ...(b.f < 1 ? [[`× ${h2(b.J.jp.v)} jours rémunérés / ${b.J.ouv} jours ouvrables`, `= <b>${eur(b.att)}</b> attendus`]] : b.fJ < 1 ? [[`<small>${h2(b.J.jp.v)} / ${b.J.ouv} jours rémunérés : la fiche paie le mois complet${b.absMt ? ' et retire l’absence sur une ligne' : ''}</small>`, '']] : b.J.jp ? [[`<small>${h2(b.J.jp.v)} / ${b.J.ouv} jours rémunérés : mois complet</small>`, '']] : []),
+      ['Rémunération sur la fiche', eur(b.base)], ...b.absL.filter(() => b.absMt).map(L => [`${L.mt < 0 ? '−' : '+'} ${esc(L.code)} ${esc(L.label)} <small>absence</small>`, eur(L.mt)]),
       ...b.flexL.map(L => [`+ ${esc(L.label)} <small>plan flex</small>`, eur(-L.mt)]), ['= Salaire avant plan flex', `<b>${eur(b.theo)}</b>`], ['Dérive vs barème', `<span class="mark">${sgn(b.d, false)}</span> <small class="note">(${pct(b.dp)})</small>`]].map(([a, v]) => `<dt>${a}</dt><dd>${v}</dd>`).join('')}</dl>`
 ; }
   { const out = [], per2 = {}; for (const L of c.mis) { const k = L.per || p.mois; per2[k] = (per2[k] || 0) + (L.mt || 0); }
     for (const [k, mt] of Object.entries(per2).sort()) { const ms = misOfMonth(k); out.push(bLine(ms.length ? 'in' : 'wa', ms.length ? ICO.in : ICO.wa, ms.length ? `Payé pour la mission ${ms.map(m => esc(m.name)).join(', ')} : ${eur(mt)}` : `Paiement de mission (${moisLbl(k)}) : ${eur(mt)}`, ms.length ? `Période ${moisLbl(k)}${k !== p.mois ? ' (rattrapage)' : ''} · le contrôle complet est dans « Mes fiches »` : 'Aucune mission encodée ce mois-là', 'data-fold="pdFoldMis"')); }
     if (!Object.keys(per2).length) out.push(bLine('in', 'i', 'Pas de paiement de mission sur cette fiche', '', 'data-fold="pdFoldMis"'));
     { const R = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup'); if (R.length) out.push(bLine('in', 'i', 'Récupération d’heures sup de ton contingent', R.map(L => `${L.h ? h2(L.h) + ' h' : ''} ${L.per ? moisLbl(L.per) : ''}`.trim()).join(' · ') + ' · hors mission', 'data-fold="pdFoldMis"')); }
+    { const E = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'exc'), A = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'abs');
+      for (const L of E) out.push(bLine('in', '+', `${esc(L.label)} : ${eur(L.mt || 0)}`, 'Entrée exceptionnelle · non comparée au barème', 'data-fold="pdFoldExc"'));
+      for (const L of A) out.push(bLine('wa', '−', `Absence : ${esc(L.label)}`, [L.h ? h2(L.h) + ' h' : '', L.j ? h2(L.j) + ' j' : '', L.mt ? eur(L.mt) : ''].filter(Boolean).join(' · ') + ' · le contrôle du barème en tient compte', 'data-fold="pdFoldExc"')); }
     out.push(briefBar(p).replace('data-fold="foldBar"', 'data-fold="pdFoldBar"'));
     $('#pdBrief').innerHTML = out.join(''); }
+  { const J = joursOf(p.mois), E = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'exc'), oth = [...new Set(p.comm.map(L => L.per).filter(k => k && k !== p.mois))].sort();
+    $('#pdExcTag').textContent = [E.length && `${E.length} prime${E.length > 1 ? 's' : ''}`, J.abs.length && `${J.abs.length} absence${J.abs.length > 1 ? 's' : ''}`, J.jp && `${h2(J.jp.v)}/${J.ouv} j`].filter(Boolean).join(' · ');
+    $('#pdExc').innerHTML = `<h4 style="margin:0 0 6px">${moisCap(p.mois)}</h4>${joursDl(J)}` + oth.map(k => `<h4 style="margin:12px 0 6px">${moisCap(k)} <small class="note">(données de communication de cette fiche)</small></h4>${joursDl(joursOf(k))}`).join('')
+      + `<h4 style="margin:12px 0 6px">Entrées exceptionnelles</h4>` + (E.length ? `<dl>${E.map(L => `<dt>${esc(L.code)} ${esc(L.label)}${L.per && L.per !== p.mois ? ` <small>${moisLbl(L.per)}</small>` : ''}</dt><dd><b>${sgn(L.mt || 0, false)}</b></dd>`).join('')}</dl>` : '<p class="note" style="margin:0">Aucune ce mois-ci.</p>')
+      + `<p class="note" style="margin:10px 0 0">Les lignes sont reconnues par leur libellé (gratification, prime, pécule… / absence, raisons familiales, 846H…). Si une ligne est mal classée, change sa catégorie dans « Toutes les lignes ».</p>`;
+    if (pdOpenFold) { const f = document.getElementById(pdOpenFold); pdOpenFold = ''; if (f) { f.open = true; setTimeout(() => f.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); } } }
   $('#pdLines').innerHTML = p.lines.map((L, i) => { const k = pcat(L), ed = L.sec === 'brut';
     return `<tr><td class="note">${esc(L.code)}</td><td>${esc(L.label)}</td><td>${L.per ? moisLbl(L.per) : ''}</td><td class="num">${L.h != null ? h2(L.h) : ''}</td><td class="num">${L.j != null ? h2(L.j) : ''}</td><td class="num">${L.mt != null ? eur(L.mt) : ''}</td><td>${ed ? `<button type="button" class="pcat" data-c="${k}" data-li="${i}" title="Changer la catégorie">${PCATS[k]}</button>` : `<span class="note">${isPrec(L) ? 'Précompte' : isOnss(L) ? 'ONSS' : 'Retenue / autre'}</span>`}</td></tr>`; }).join('');
 }
@@ -4180,8 +4301,10 @@ $('#pdLines').addEventListener('click', e => { const b = e.target.closest('[data
   Store.saveProfil(); renderPAIED(); saveState(`« ${L.label} » → ${PCATS[nx]} (toutes les fiches)`); });
 ['click', 'keydown'].forEach(t => $('#pdBrief').addEventListener(t, e => { const el = e.target.closest('.bline'); if (!el || (e.type === 'keydown' && e.key !== 'Enter')) return; const f = document.getElementById(el.dataset.fold); if (f) { f.open = true; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }));
 $('#pdBack').addEventListener('click', () => go('paie'));
-$('#pdDel').addEventListener('click', () => { const i = st.paies.findIndex(x => x.id === paieId); if (i < 0) return; const old = st.paies[i];
-  st.paies.splice(i, 1); Store.saveProfil(); go('paie'); undoToast(`Fiche ${moisLbl(old.mois)} supprimée`, () => { st.paies.push(old); Store.saveProfil(); renderPAIE(); }); });
+$('#pdPdf').addEventListener('click', () => pdfView(paieId));
+$('#pdDel').addEventListener('click', async () => { const i = st.paies.findIndex(x => x.id === paieId); if (i < 0) return; const old = st.paies[i];
+  const blob = old.pdf ? await PdfStore.get(old.id) : null; if (blob) PdfStore.del(old.id);
+  st.paies.splice(i, 1); Store.saveProfil(); go('paie'); undoToast(`Fiche ${moisLbl(old.mois)} supprimée`, () => { st.paies.push(old); if (blob) PdfStore.put(old.id, blob).catch(() => {}); Store.saveProfil(); renderPAIE(); }); });
 
 
 syncBrut();
