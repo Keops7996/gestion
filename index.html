@@ -1702,7 +1702,7 @@ function buildDoc(src, meta){
     mission: tmp.mission, params: tmp.params, days: tmp.days,
     created: meta.created || now, updated: now, exported: meta.exported || null, signDate: meta.signDate || '', payDate: meta.payDate || '', checklist: meta.checklist || null,
     sum: R.ok ? { v: RULES_V, N: R.N, j7: R.N - num(tmp.params.deduire), depart: m.depart, retour: m.retour, pays: m.pays, ville: m.ville, client: m.client,
-      prestees: R.G3, fn: R.G2, hs: R.G4, coef: R.G2 > 0 ? R.O7 : null, brut: withRec ? R.R14 : R.R9, allowance: R.L4, solde: R.L5, recup: R.G5,
+      prestees: R.G3, fn: R.G2, hs: R.G4, coef: R.G2 > 0 ? R.O7 : null, brut: withRec ? R.R14 : R.R9, r4: R.R4, allowance: R.L4, solde: R.L5, recup: R.G5,
       saisi: Object.values(tmp.days).some(d => d && (d.debut || d.fin)) } : null
   };
 }
@@ -1995,9 +1995,14 @@ $('#histBody').addEventListener('change', e => {
   if (id === currentId) currentMeta[inp.dataset.f] = inp.value;
   Store.save(id, doc);
 });
-function hoursOf(d){ const x = d.sum, part = d.params && d.params.paiement === 'partiel'; const maj = (x.hs || 0) * (x.coef || 0); const rec = part ? (x.recup || 0) : 0, paid = Math.max(0, maj - rec);
-  // raw = heures payées en heures sup sur la fiche : heures prestées − horaire normal FN, au prorata de la part payée (hors récup)
-  return { rec, paid, maj, raw: maj > 0 ? (x.hs || 0) * paid / maj : 0 }; }
+/* Rémunération réelle d'une mission : le coefficient s'applique au TOTAL des heures prestées.
+   total pondéré = A × coef ; l'horaire normal B est déjà payé dans le salaire (0BAE) ; les heures en récup (après coef.) sont retirées.
+   heures payées en plus = A × coef − B − récup ; montant = taux horaire (salaire de la période / B) × ces heures. */
+function misPay(x, part, rate4){ const A = x.prestees || 0, B = x.fn || 0, coef = x.coef || 0, hs = x.hs || 0, tot = A * coef, maj = Math.max(0, tot - B), rec = part ? (x.recup || 0) : 0, paid = Math.max(0, maj - rec);
+  let rate = 0; if (B > 0) { if (rate4 > 0) rate = rate4 / B; else { const den = hs * coef - (part && rec > 0 ? rec : 0); if (den > 0 && x.brut) rate = x.brut / den; else if (num(st.perso.brut) && x.N) rate = num(st.perso.brut) * x.N / 30.4 / B; } }
+  // raw = heures sup « réelles » (prestées − horaire FN) au prorata de la part payée : base du contingent fiscal et des heures HS de la fiche
+  return { A, B, coef, tot, rec, paid, maj, raw: maj > 0 ? hs * paid / maj : 0, rate, amt: rate * paid }; }
+function hoursOf(d){ const x = d.sum; return misPay(x, d.params && d.params.paiement === 'partiel', x.r4); }
 
 /* ---- tableau des jours ---- */
 function dayList(){
@@ -2082,11 +2087,11 @@ function update(){
   $('#recupMaxN').textContent = R.ok ? `(${maxRec} h)` : '';
   const left = Math.max(0, 156 - used), over = part && R.ok && R.G5 > left + 1e-9;
   $('#recupHint').innerHTML = part && R.ok ? `Heures supp. max de la mission : ${h2(R.G6)} h (HS × coef.). Déjà ${h2(used)} h récupérées en ${st.mission.depart.slice(0,4)}, reste ${h2(left)} h sur 156.${over ? ` <b style="color:var(--warn)">Attention : ${h2(R.G5)} h dépassent le reste de l’année.</b>` : ''}` : '';
-  const recNow = part ? R.G5 : 0, brutNow = part && R.G5 > 0 ? R.R14 : R.R9;
-  { const cap = hsCap(), yr = (st.mission.depart || '').slice(0, 4), paidH = Math.max(0, R.G6 - recNow), rawH = R.G6 > 0 ? R.G4 * paidH / R.G6 : 0, used = R.ok ? hsUsedBefore(yr, st.mission.depart, currentId) : 0;
+  const recNow = part ? R.G5 : 0, MP = misPay({ prestees: R.G3, fn: R.G2, hs: R.G4, coef: R.G2 > 0 ? R.O7 : 0, recup: R.G5 }, part, R.R4), brutNow = MP.amt;
+  { const cap = hsCap(), yr = (st.mission.depart || '').slice(0, 4), paidH = MP.paid, rawH = MP.raw, used = R.ok ? hsUsedBefore(yr, st.mission.depart, currentId) : 0;
     const inH = Math.max(0, Math.min(rawH, cap - used)), outH = rawH - inH, bIn = rawH ? brutNow * inH / rawH : brutNow, bOut = brutNow - bIn, net = bIn * 0.66 + bOut * 0.45;
     $('#payOut').innerHTML = R.ok ? `<div><div class="k">Rémunération mission brut</div><div class="v">${eur(brutNow)}</div></div><div><div class="k">Net estimé</div><div class="v">${eur(net)}</div></div><div><div class="k">Contingent fiscal ${yr}</div><div class="v">${h2(Math.max(0, cap - used - inH))}<small> h restantes</small></div></div>
-      <div class="k" style="grid-column:1/-1">${part ? `${h2(recNow)} h en récup, ${h2(paidH)} h payées (après coef.)` : `${h2(paidH)} h payées (après coef.), aucune récup`} · <b>${h2(rawH)} h sup sur la fiche</b> <small>(prestées − horaire FN${part ? ', part payée' : ''})</small></div>${(() => { const HP = st.cfg && st.cfg.policy && st.cfg.policy.hs; return HP ? `<div class="hscap" style="grid-column:1/-1">${HP.ref ? `<span class="ref" style="margin:0 6px 0 0">${esc(HP.ref)}</span>` : ''}<b>${esc(HP.formule || '')}</b> = 1 + (${h2(R.G3)} − ${h2(R.G2)}) / ${h2(R.G2)}${R.G2 ? ` = ${h2(1 + (R.G3 - R.G2) / R.G2)}` : ''} → coefficient total ${h2(R.O7)}. Heures sup A − B = ${h2(R.G4)} h${part ? ` ; part payée : ${h2(R.G4)} × ${h2(paidH)} / ${h2(R.G6)} = ${h2(rawH)} h` : ''}.</div>` : ''; })()}
+      <div class="k" style="grid-column:1/-1">${h2(R.G3)} h × ${h2(R.O7)} = ${h2(MP.tot)} h − ${h2(R.G2)} h d’horaire normal (dans ton salaire)${part ? ` − ${h2(recNow)} h en récup` : ''} = <b>${h2(paidH)} h payées en plus</b> · dont ${h2(rawH)} h sup réelles <small>(prestées − horaire FN${part ? ', part payée' : ''})</small></div>${(() => { const HP = st.cfg && st.cfg.policy && st.cfg.policy.hs; return HP ? `<div class="hscap" style="grid-column:1/-1">${HP.ref ? `<span class="ref" style="margin:0 6px 0 0">${esc(HP.ref)}</span>` : ''}<b>${esc(HP.formule || '')}</b> = 1 + (${h2(R.G3)} − ${h2(R.G2)}) / ${h2(R.G2)}${R.G2 ? ` = ${h2(1 + (R.G3 - R.G2) / R.G2)}` : ''} → coefficient total ${h2(R.O7)}. Heures sup A − B = ${h2(R.G4)} h${part ? ` ; part payée : ${h2(R.G4)} × ${h2(paidH)} / ${h2(R.G6)} = ${h2(rawH)} h` : ''}.</div>` : ''; })()}
       <div class="hscap" style="grid-column:1/-1"><b>Heures sup avec réduction fiscale : ${h2(cap)} h max par an</b> (régime légal, CP 209). Déjà utilisées en ${yr} avant cette mission : ${h2(used)} h.<br>
       Cette mission : <b>${h2(inH)} h</b> dans le contingent → ${eur(bIn)} × 66 % = ${eur(bIn * 0.66)}${outH > 0.005 ? `<br><span class="pneg"><b>${h2(outH)} h au-delà des ${h2(cap)} h</b> : taxation normale, sans réduction → ${eur(bOut)} × 45 % = ${eur(bOut * 0.45)}</span>` : ''}<br>
       Net estimé = <b>${eur(net)}</b> <small class="note">(taux nets estimés : 66 % avec réduction, 45 % sans)</small></div>` : ''; }
@@ -3781,7 +3786,7 @@ function misList(){
   const out = [];
   for (const [id, d] of Store.missions) { if (!d || !d.sum || !d.sum.depart) continue; const x = d.sum, ret = x.retour || x.depart;
     const months = {}; let n = 0; for (let t = new Date(x.depart + 'T12:00'); t <= new Date(ret + 'T12:00'); t.setDate(t.getDate() + 1)) { const k = t.toISOString().slice(0, 7); months[k] = (months[k] || 0) + 1; n++; }
-    out.push({ id, d, name: (d.mission && d.mission.nom) || x.ville || x.pays || 'Mission', depart: x.depart, retour: ret, months, n: n || 1, exp: x.brut || 0, hsExp: hoursOf(d).raw, paidC: hoursOf(d).paid, rec: hoursOf(d).rec, maj: hoursOf(d).maj }); }
+    out.push({ id, d, name: (d.mission && d.mission.nom) || x.ville || x.pays || 'Mission', depart: x.depart, retour: ret, months, n: n || 1, exp: hoursOf(d).amt || 0, tot: hoursOf(d).tot, hsExp: hoursOf(d).raw, paidC: hoursOf(d).paid, rec: hoursOf(d).rec, maj: hoursOf(d).maj }); }
   return out.sort((a, b) => b.depart.localeCompare(a.depart));
 }
 function gapCalc(){
@@ -3824,10 +3829,11 @@ function gapReport(m){
   h += dl([
     ['Période', `${dFr(m.depart)} → ${dFr(m.retour)} · ${m.n} j (${Object.entries(m.months).sort().map(([k, n]) => `${moisLbl(k)} : ${n} j`).join(', ')})`],
     ['Heures prestées (A)', x.prestees != null ? h2(x.prestees) + ' h' : '—'], ['Horaire normal FN (B)', x.fn != null ? h2(x.fn) + ' h' : '—'],
-    ['Heures sup <small>A − B</small>', h2(raw) + ' h'], ['Coefficient', coef ? h2(coef) + (x.fn ? ` <small class="note">(1 + (${h2(x.prestees)} − ${h2(x.fn)}) / ${h2(x.fn)} = ${h2(1 + (x.prestees - x.fn) / x.fn)} + resp./séniorité)</small>` : '') : '—'], ['Heures sup après coefficient <small>brutes × coef.</small>', `<b>${h2(m.maj)} h</b>`],
-    ['Paiement', part ? 'partiel (une partie en récupération)' : 'intégral'], ['→ à récupérer', h2(m.rec) + ' h'], ['→ payées <small>après coef. − récup</small>', `${h2(m.paidC)} h`],
+    ['Heures sup <small>A − B</small>', h2(raw) + ' h'], ['Coefficient', coef ? h2(coef) + (x.fn ? ` <small class="note">(1 + (${h2(x.prestees)} − ${h2(x.fn)}) / ${h2(x.fn)} = ${h2(1 + (x.prestees - x.fn) / x.fn)} + resp./séniorité)</small>` : '') : '—'], ['Total pondéré <small>A × coefficient (le coefficient s’applique à toutes les heures)</small>', `${h2(x.prestees)} × ${h2(coef)} = <b>${h2(m.tot)} h</b>`],
+    ['− horaire normal FN (B) <small>déjà payé dans ton salaire (0BAE)</small>', `= ${h2(m.maj)} h à payer en plus`],
+    ['Paiement', part ? 'partiel (une partie en récupération)' : 'intégral'], ['− heures en récup <small>après coef., pas payées sur la fiche</small>', h2(m.rec) + ' h'], ['= <b>heures payées en plus du salaire</b>', `<b>${h2(m.paidC)} h</b>`],
     [`→ <b>heures sup attendues sur la fiche</b> <small>prestées − horaire FN${part ? ', au prorata de la part payée' : ''}</small>`, `<b>${h2(m.hsExp)} h</b>${part && m.maj ? ` <small class="note">(${h2(raw)} × ${h2(m.paidC)} / ${h2(m.maj)})</small>` : ''}`],
-    ['Rémunération mission brut attendue', `<b>${eur(m.exp)}</b>`]]);
+    ['Rémunération mission brut attendue <small>taux horaire × heures payées en plus</small>', `${eur(hoursOf(m.d).rate)}/h × ${h2(m.paidC)} h = <b>${eur(m.exp)}</b>`]]);
   h += `<h4>2 · Ce que disent les fiches de paie</h4><p class="note">L’app cherche, sur toutes les fiches importées, les lignes « Mission » et « Heures sup. » dont la <b>période</b> tombe pendant la mission, plus les heures sup de la partie « Communication ».</p>`;
   for (const P of m.per) {
     h += `<div class="pmis"><h5>${moisCap(P.k)} <small class="note">(${P.n} j de mission)</small></h5>`;
@@ -4145,7 +4151,7 @@ $('#ieBody').addEventListener('change', e => { const el = e.target.closest('[dat
   P[y] = { ...(P[y] || {}), [el.dataset.iek]: el.value }; Store.saveProfil(); setTimeout(() => { renderIE(); autoLabel($('#ieCard')); }, 0); });
 /* --- politique interne (fichier de règles chargé par l'utilisateur, gardé dans la db) --- */
 function applyPolicy(J, fname){
-  st.cfg = st.cfg || {}; st.cfg.policy = { name: J.name || 'Politique interne', version: J.version || '', rules: J.rules || [], ie: J.ie || null, hs: J.hs || null, fichier: fname, loaded: new Date().toISOString() };
+  st.cfg = st.cfg || {}; st.cfg.policy = { name: J.name || 'Politique interne', version: J.version || '', rules: J.rules || [], ie: J.ie || null, hs: J.hs || null, rev: +J.rev || 1, fichier: fname, loaded: new Date().toISOString() };
   let n = 0; const c = st.cfg; if (Array.isArray(J.items) && Array.isArray(c.items)) { const have = new Set(c.items.map(it => normTxt(it.text)));
     for (const x of J.items) { const text = String(x.text || '').trim(), cat = String(x.cat || 'Administratif').trim(); if (!text || have.has(normTxt(text))) continue;
       if (!c.cats.includes(cat)) c.cats.splice(Math.max(0, c.cats.indexOf('Retour')) || c.cats.length, 0, cat);
@@ -4156,7 +4162,8 @@ function applyPolicy(J, fname){
 function applyPreset(){ const P = window.__PRESET__; if (!P || !st.cfg) return; let ch = false;
   const done = st.cfg.presetDone = st.cfg.presetDone || {}; done.g = done.g || [];
   for (const g of P.grilles || []) if (!done.g.includes(g.date)) { if (!(st.cfg.grilles || []).some(x => x.date === g.date)) (st.cfg.grilles = st.cfg.grilles || []).push(g); done.g.push(g.date); ch = true; }
-  if (P.policy && !done.policy) { if (!st.cfg.policy) applyPolicy(P.policy, 'intégrée'); done.policy = true; ch = true; }
+  if (P.policy) { const r = +P.policy.rev || 1, cur = st.cfg.policy;   // une révision plus récente de la politique intégrée remplace l'ancienne (même nom)
+    if (done.policy !== r && (!cur || (cur.name === P.policy.name && (cur.rev || 1) < r))) { if (!done.policy || cur) applyPolicy(P.policy, 'intégrée'); done.policy = r; ch = true; } }
   if (ch) Store.saveProfil(); }
 async function policyImport(f){
   try { if (/\.pdf$/i.test(f.name)) throw new Error('pdf');
@@ -4270,7 +4277,7 @@ function renderPAIED(){
   $('#pdMis').innerHTML = Object.keys(per).sort().map(k => { const ms = misOfMonth(k), tot = per[k].reduce((s, L) => s + (L.mt || 0), 0);
     return `<div class="pmis"><h4>${moisCap(k)}${k !== p.mois ? ' <small class="note">(rattrapage)</small>' : ''} : ${ms.length ? ms.map(m => `mission « ${esc(m.name)} » <small class="note">${dFr(m.depart)} → ${dFr(m.retour)}</small>`).join(', ') : '<span class="pneg">aucune mission encodée ce mois-là</span>'}</h4>
       <ul>${per[k].map(L => `<li>${esc(L.label)}${L.h ? ` — ${h2(L.h)} h` : ''}${L.j ? ` — ${h2(L.j)} j` : ''} : <b>${eur(L.mt || 0)}</b> <small class="note">(${PCATS[pcat(L)]})</small></li>`).join('')}</ul>
-      <div class="note" style="margin-top:4px">Total : <b>${eur(tot)}</b>${ms.length === 1 ? ` · attendu pour la mission : ${eur(ms[0].exp)} · HS après coef. : ${h2(ms[0].maj)} h, dont <b>${h2(ms[0].hsExp)} h payées</b> et <b>${h2(ms[0].rec)} h à récupérer</b>` : ''}</div></div>`; }).join('')
+      <div class="note" style="margin-top:4px">Total : <b>${eur(tot)}</b>${ms.length === 1 ? ` · attendu pour la mission : ${eur(ms[0].exp)} · heures à payer en plus du salaire (A × coef. − B) : ${h2(ms[0].maj)} h, dont <b>${h2(ms[0].paidC)} h payées</b> (${h2(ms[0].hsExp)} h sup réelles) et <b>${h2(ms[0].rec)} h à récupérer</b>` : ''}</div></div>`; }).join('')
     || `<p class="note" style="margin:0">Aucune ligne « Mission » ou « Heures sup. » sur cette fiche. Si une ligne en est une, change sa catégorie plus bas.</p>`;
   { const R = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup'); if (R.length) $('#pdMis').innerHTML += `<div class="pmis"><h4>Congé pris sur tes heures sup <small class="note">(payé comme un jour travaillé, hors mission, non comparée aux missions)</small></h4><ul>${R.map(L => `<li>${esc(L.code)} ${esc(L.label)}${L.per ? ` — ${moisLbl(L.per)}` : ''}${L.h ? ` — ${h2(L.h)} h` : ''}${L.mt ? ` : ${eur(L.mt)}` : ''}</li>`).join('')}</ul></div>`; }
   if (c.hsCom) $('#pdMis').innerHTML += `<p class="note" style="margin:6px 0 0">Communication de la fiche : ${p.comm.filter(L => /\bhs\b|suppl/.test(normTxt(L.label)) && L.h).map(L => `${esc(L.label)} ${moisLbl(L.per)} : ${h2(L.h)} h`).join(' · ')}.</p>`;
