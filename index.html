@@ -445,6 +445,7 @@ details.card.fold:not([open])>summary{border-bottom:0}
 .paiedrop label.keep{display:flex;flex-direction:row;gap:8px;align-items:flex-start;margin-top:8px;font-size:13px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--ink)}.paiedrop label.keep input{width:auto;flex:none;margin:2px 0 0;min-height:0}.keep small{display:inline}
 .recapgrid>.tablebox{min-width:0}.recapgrid table{min-width:0!important;width:100%}.pvbtn{padding:2px 8px;font-size:11px;margin-left:6px;vertical-align:1px}
 select.alloc{max-width:230px;padding:3px 6px;font-size:12px;min-height:0}.allocmt{display:inline-flex;gap:4px;align-items:center;font-size:12px;margin-top:4px}.allocmt input{width:90px;padding:3px 6px;font-size:12px;min-height:0}
+#recapBody dl.rows dd,#recapBody dl.rows dt{white-space:normal;min-width:0;overflow-wrap:anywhere}#recapBody dl.rows dd{text-align:right}
 .ieset{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:0 0 6px;font-size:13px}.ieset label{display:flex;gap:6px;align-items:center}
 .paiet td{vertical-align:top}.paiet .pst{white-space:normal}
 .gapdet>td>.gaprep{width:0;min-width:100%;box-sizing:border-box}
@@ -3948,7 +3949,43 @@ function recapYear(y){
       else add(OUT, 'Chèques repas, avantages récupérés, autres', -v); } }
   for (const o of [IN, OUT]) for (const k of Object.keys(o)) if (Math.abs(o[k]) < 0.005) delete o[k];
   const tIn = Object.values(IN).reduce((a, b) => a + b, 0), tOut = Object.values(OUT).reduce((a, b) => a + b, 0);
-  return { y, P, IN, OUT, tIn, tOut, net, ex, recH };
+  // impôt : taux par fiche, moyenne, et estimation séparée pour les paiements de mission
+  const T = P.map(p => ({ p, c: paieCalc(p) })), sm = (A, f) => A.reduce((a, o) => a + f(o), 0);
+  const withM = T.filter(o => o.c.misMt > 0.005), noM = T.filter(o => !(o.c.misMt > 0.005));
+  const rate = A => { const i = sm(A, o => o.c.imp); return i ? sm(A, o => o.c.prec) / i : NaN; };
+  const txAll = rate(T), txNo = rate(noM), txM = rate(withM), onssR = sm(T, o => o.c.brut) ? sm(T, o => o.c.onss) / sm(T, o => o.c.brut) : 0.1307;
+  let misTax = NaN, misMt = sm(withM, o => o.c.misMt);
+  if (withM.length && isFinite(txNo)) { const base = sm(withM, o => o.c.imp - o.c.misMt * (1 - onssR)), extra = sm(withM, o => o.c.prec) - txNo * base; misTax = misMt ? extra / misMt : NaN; }
+  // heures de mission de l'année (Heures Mission) et heures sur les fiches
+  const MH = misList().filter(m => m.depart.startsWith(y)).map(m => ({ m, x: m.d.sum, h: hoursOf(m.d) }));
+  const mh = { n: MH.length, A: sm(MH, o => o.x.prestees || 0), hs: sm(MH, o => o.x.hs || 0), maj: sm(MH, o => o.h.maj), paid: sm(MH, o => o.h.paid), rec: sm(MH, o => o.h.rec), exp: sm(MH, o => o.m.exp), fiche: sm(T, o => o.c.misH) };
+  // plan flex : réductions de salaire brut et avantages en nature imposés
+  const flex = sm(P, p => -p.comm.filter(L => /^red\.?\s*sal/.test(normTxt(L.label)) && L.mt).reduce((a, L) => a + L.mt, 0));
+  const flexL = {}; for (const p of P) for (const L of p.comm) if (/^red\.?\s*sal/.test(normTxt(L.label)) && L.mt) flexL[L.label] = (flexL[L.label] || 0) - L.mt;
+  const atnL = {}; for (const p of P) for (const L of p.lines) if (L.sec !== 'brut' && (L.mt || 0) > 0 && !isOnss(L) && !isPrec(L) && !/onss/.test(normTxt(L.label))) atnL[L.label] = (atnL[L.label] || 0) + L.mt;
+  const atn = Object.values(atnL).reduce((a, b) => a + b, 0), tm = isFinite(misTax) && misTax > 0.2 && misTax < 0.7 ? misTax : 0.45;
+  const fx = { flex, flexL, atn, atnL, onss: flex * onssR, tax: flex * (1 - onssR) * tm, atnTax: atn * tm, tm, tmSrc: tm === misTax ? 'estimé sur tes paiements de mission' : 'taux marginal belge courant' };
+  fx.cost = flex - fx.onss - fx.tax + fx.atnTax;
+  return { y, P, IN, OUT, tIn, tOut, net, ex, recH, T, txAll, txNo, txM, misTax, misMt, onssR, mh, fx };
+}
+function recapMore(R){
+  const H3 = t => `<h3 class="lbl" style="margin:16px 0 6px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;font-size:12px">${t}</h3>`, mh = R.mh, fx = R.fx;
+  let h = H3('Heures de mission') + (mh.n ? `<div class="kpis k4">${[['Missions', mh.n], ['Heures prestées', h2(mh.A) + ' h'], ['Heures sup', h2(mh.hs) + ' h'], ['Après coefficient', h2(mh.maj) + ' h']].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
+    <p class="note" style="margin:6px 0 0">Dont <b>${h2(mh.paid)} h payées</b> et <b>${h2(mh.rec)} h en récup</b> · rémunération mission attendue ${eur(mh.exp)} · heures sur les lignes de mission des fiches : ${h2(mh.fiche)} h. Missions dont le départ est en ${R.y}.</p>` : '<p class="note" style="margin:0">Aucune mission encodée cette année.</p>');
+  h += H3('Impôt (précompte) par fiche') + `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Mois</th><th class="num">Brut</th><th class="num">Imposable</th><th class="num">Précompte</th><th class="num">Taux</th><th class="num">Dont mission</th></tr></thead><tbody>${R.T.map(o => `<tr><td>${moisCap(o.p.mois)}</td><td class="num">${eur(o.c.brut)}</td><td class="num">${eur(o.c.imp)}</td><td class="num">${eur(o.c.prec)}</td><td class="num"><b>${pct(o.c.tx)}</b></td><td class="num">${o.c.misMt > 0.005 ? eur(o.c.misMt) : '—'}</td></tr>`).join('')}
+    <tr class="tot"><td><b>Moyenne ${R.y}</b></td><td class="num">${eur(R.T.reduce((a, o) => a + o.c.brut, 0))}</td><td class="num">${eur(R.T.reduce((a, o) => a + o.c.imp, 0))}</td><td class="num">${eur(R.T.reduce((a, o) => a + o.c.prec, 0))}</td><td class="num"><b>${pct(R.txAll)}</b></td><td></td></tr></tbody></table></div>
+    <dl class="rows" style="margin-top:8px">${[['Taux moyen, fiches sans mission', pct(R.txNo)], ['Taux moyen, fiches avec mission', pct(R.txM)],
+      ['<b>Impôt estimé sur les paiements de mission</b> <small>précompte en plus par rapport aux mois sans mission ÷ montant mission</small>', isFinite(R.misTax) ? `<b>${pct(R.misTax)}</b> <small class="note">(${eur(R.misMt)} de mission → ≈ ${eur(R.misTax * R.misMt)} d’impôt)</small>` : '<span class="note">il faut au moins une fiche avec et une sans mission</span>']].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>
+    <p class="note" style="margin:4px 0 0">Taux = précompte ÷ imposable de la fiche. Le précompte n’est qu’une avance : l’impôt réel est fixé par la déclaration annuelle (les heures sup avec réduction fiscale diminuent l’impôt final).</p>`;
+  h += H3('Coût réel du plan flex') + (fx.flex || fx.atn ? `<dl class="rows">${[
+      ...Object.entries(fx.flexL).map(([k, v]) => [`${esc(k)} <small>réduction de salaire brut</small>`, eur(v)]),
+      ['= Salaire brut cédé', `<b>${eur(fx.flex)}</b>`],
+      [`− ONSS économisée <small>${pct(R.onssR)} du brut</small>`, eur(fx.onss)],
+      [`− impôt économisé <small>${pct(fx.tm)} (${fx.tmSrc})</small>`, eur(fx.tax)],
+      ...Object.entries(fx.atnL).map(([k, v]) => [`+ impôt sur ${esc(k)} <small>avantage en nature imposé : ${eur(v)} × ${pct(fx.tm)}</small>`, eur(v * fx.tm)]),
+      ['<b>= Coût net réel pour toi</b>', `<b>${eur(fx.cost)}</b> <small class="note">(${eur(fx.cost / Math.max(1, R.P.length))} par mois)</small>`]].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>
+    <p class="note" style="margin:4px 0 0">Estimation : ce que le plan flex te coûte réellement en net, une fois l’ONSS et l’impôt économisés déduits et l’impôt sur les avantages en nature (voiture, GSM…) ajouté. À comparer avec la valeur de ce que tu reçois (voiture, carburant, GSM…).</p>` : '<p class="note" style="margin:0">Aucune réduction de salaire « plan flex » sur les fiches de cette année.</p>');
+  return h;
 }
 function renderRecap(){
   const ys = [...new Set(st.paies.map(p => p.mois.slice(0, 4)))].sort(), y = paieYear && paieYear !== 'all' ? paieYear : ys[ys.length - 1];
@@ -3959,6 +3996,7 @@ function renderRecap(){
   $('#recapBody').innerHTML = `<div class="kpis k4" style="margin-bottom:12px">${[['Entrées (IN)', eur(R.tIn)], ['Sorties (OUT)', eur(R.tOut)], ['Net versé', eur(R.net)], ['Net / brut', pct(R.tIn ? R.net / R.tIn : NaN)]].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>
     <div class="recapgrid"><div class="tablebox"><table class="hist"><thead><tr><th>IN · ce qui entre (brut)</th><th class="num">Montant</th><th class="num">%</th></tr></thead><tbody>${tb(R.IN, R.tIn)}<tr class="tot"><td><b>Total IN</b></td><td class="num"><b>${eur(R.tIn)}</b></td><td></td></tr></tbody></table></div>
     <div class="tablebox"><table class="hist"><thead><tr><th>OUT · ce qui sort</th><th class="num">Montant</th><th class="num">%</th></tr></thead><tbody>${tb(R.OUT, R.tIn)}<tr class="tot"><td><b>Total OUT</b></td><td class="num"><b>${eur(R.tOut)}</b></td><td></td></tr></tbody></table></div></div>
+    ${recapMore(R)}
     <h3 class="lbl" style="margin:14px 0 6px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;font-size:12px">Entrées et sorties exceptionnelles</h3>
     ${R.ex.length ? `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Mois</th><th>Ligne</th><th class="num">Heures / jours</th><th class="num">Montant</th></tr></thead><tbody>${R.ex.map(o => `<tr><td>${moisCap(o.mois)}</td><td><span class="pst ${o.c === 'exc' ? 'ok' : o.c === 'recup' ? '' : 'wa'}">${o.c === 'exc' ? 'IN' : o.c === 'recup' ? 'congé récup' : (o.L.mt || 0) < 0 ? 'OUT' : 'absence'}</span> ${esc(o.L.code)} ${esc(o.L.label)}${o.L.per && o.L.per !== o.mois ? ` <small class="note">(${moisLbl(o.L.per)})</small>` : ''}</td><td class="num">${[o.L.h ? h2(o.L.h) + ' h' : '', o.L.j ? h2(o.L.j) + ' j' : ''].filter(Boolean).join(' · ') || '—'}</td><td class="num">${o.L.mt ? sgn(o.L.mt) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="note" style="margin:0">Aucune prime ni absence sur les fiches de cette année.</p>'}
     <p class="note" style="margin:10px 0 0">IN = toutes les lignes positives du brut (le brut ONSS de chaque fiche). OUT = cotisations, précompte et retenues ; IN − OUT = net versé. Les avantages en nature (GSM, voiture…) sont ajoutés au brut puis récupérés : ils apparaissent des deux côtés.${R.recH ? ` Congés pris sur tes heures sup cette année : <b>${h2(R.recH)} h</b> (payés comme des jours travaillés).` : ''}${miss.length ? ` <b>Fiches manquantes : ${miss.join(', ')}</b> — importe-les pour un récap complet.` : ''}</p>`;
