@@ -1723,7 +1723,10 @@ function withProfile(src){
   const m = src.mission; const n = (m.depart && m.retour) ? serialOf(m.retour) - serialOf(m.depart) + 1 : 0;
   src.params.deduire = String(weekendsIn(m) * 0.5);
   src.params.risque = m.risque && n > 0 ? String(n) : '';
-  if (num(src.params.helico) > n) src.params.helico = String(Math.max(0, n)); if (src.params.paiement !== 'partiel') src.params.recup = ''; return src; }
+  if (num(src.params.helico) > n) src.params.helico = String(Math.max(0, n)); if (src.params.paiement !== 'partiel') src.params.recup = '';
+  // salaire de référence de la mission : barème SETCa en vigueur à la date de départ (catégorie, âge, régime), sinon le brut du profil
+  const B = m.depart ? barBrutAt(m.depart.slice(0, 7)) : null;
+  return B && B.bar > 0 ? { ...src, perso: { ...src.perso, brut: B.bar.toFixed(2) }, barRef: B } : src; }
 let saveTimer = null;
 function scheduleSave(){
   if (!currentId || missionError()) return;
@@ -2092,7 +2095,7 @@ function update(){
   { const cap = hsCap(), yr = (st.mission.depart || '').slice(0, 4), paidH = MP.paid, rawH = MP.raw, used = R.ok ? hsUsedBefore(yr, st.mission.depart, currentId) : 0;
     const inH = Math.max(0, Math.min(rawH, cap - used)), outH = rawH - inH, bIn = rawH ? brutNow * inH / rawH : brutNow, bOut = brutNow - bIn, net = bIn * 0.66 + bOut * 0.45;
     $('#payOut').innerHTML = R.ok ? `<div><div class="k">Rémunération mission brut</div><div class="v">${eur(brutNow)}</div></div><div><div class="k">Net estimé</div><div class="v">${eur(net)}</div></div><div><div class="k">Contingent fiscal ${yr}</div><div class="v">${h2(Math.max(0, cap - used - inH))}<small> h restantes</small></div></div>
-      <div class="k" style="grid-column:1/-1">${h2(R.G3)} h prestées − ${h2(R.G2)} h d’horaire normal (dans ton salaire) = ${h2(R.G4)} h sup × ${h2(R.O7)} = ${part ? `${h2(MP.maj)} h − ${h2(recNow)} h en récup = ` : ''}<b>${h2(paidH)} h payées en plus</b> <small>(${h2(rawH)} h sup réelles${part ? ', part payée' : ''})</small></div>${(() => { const HP = st.cfg && st.cfg.policy && st.cfg.policy.hs; return HP ? `<div class="hscap" style="grid-column:1/-1">${HP.ref ? `<span class="ref" style="margin:0 6px 0 0">${esc(HP.ref)}</span>` : ''}<b>${esc(HP.formule || '')}</b> = 1 + (${h2(R.G3)} − ${h2(R.G2)}) / ${h2(R.G2)}${R.G2 ? ` = ${h2(1 + (R.G3 - R.G2) / R.G2)}` : ''} → coefficient total ${h2(R.O7)}. Heures sup A − B = ${h2(R.G4)} h${part ? ` ; part payée : ${h2(R.G4)} × ${h2(paidH)} / ${h2(R.G6)} = ${h2(rawH)} h` : ''}.</div>` : ''; })()}
+      <div class="k" style="grid-column:1/-1">${h2(R.G3)} h prestées − ${h2(R.G2)} h d’horaire normal (dans ton salaire) = ${h2(R.G4)} h sup × ${h2(R.O7)} = ${part ? `${h2(MP.maj)} h − ${h2(recNow)} h en récup = ` : ''}<b>${h2(paidH)} h payées en plus</b> <small>(${h2(rawH)} h sup réelles${part ? ', part payée' : ''})</small>${(() => { const B = st.mission.depart ? barBrutAt(st.mission.depart.slice(0, 7)) : null; return B ? `<br><small>Salaire de référence : <b>${eur(B.bar)}</b> (barème SETCa du ${dFr(B.g.date)} · catégorie ${esc(B.classe)} · ${B.ageTxt}) × ${R.N} j ÷ 30,4 ÷ ${h2(R.G2)} h = ${eur(R.G2 > 0 ? R.R4 / R.G2 : 0)}/h</small>` : `<br><small>Salaire de référence : brut du profil (${eur(num(st.perso.brut))}) — charge le barème et une fiche de paie pour utiliser le barème selon ton âge</small>`; })()}</div>${(() => { const HP = st.cfg && st.cfg.policy && st.cfg.policy.hs; return HP ? `<div class="hscap" style="grid-column:1/-1">${HP.ref ? `<span class="ref" style="margin:0 6px 0 0">${esc(HP.ref)}</span>` : ''}<b>${esc(HP.formule || '')}</b> = 1 + (${h2(R.G3)} − ${h2(R.G2)}) / ${h2(R.G2)}${R.G2 ? ` = ${h2(1 + (R.G3 - R.G2) / R.G2)}` : ''} → coefficient total ${h2(R.O7)}. Heures sup A − B = ${h2(R.G4)} h${part ? ` ; part payée : ${h2(R.G4)} × ${h2(paidH)} / ${h2(R.G6)} = ${h2(rawH)} h` : ''}.</div>` : ''; })()}
       <div class="hscap" style="grid-column:1/-1"><b>Heures sup avec réduction fiscale : ${h2(cap)} h max par an</b> (régime légal, CP 209). Déjà utilisées en ${yr} avant cette mission : ${h2(used)} h.<br>
       Cette mission : <b>${h2(inH)} h</b> dans le contingent → ${eur(bIn)} × 66 % = ${eur(bIn * 0.66)}${outH > 0.005 ? `<br><span class="pneg"><b>${h2(outH)} h au-delà des ${h2(cap)} h</b> : taxation normale, sans réduction → ${eur(bOut)} × 45 % = ${eur(bOut * 0.45)}</span>` : ''}<br>
       Net estimé = <b>${eur(net)}</b> <small class="note">(taux nets estimés : 66 % avec réduction, 45 % sans)</small></div>` : ''; }
@@ -3792,7 +3795,10 @@ function misList(){
   for (const [id, d] of Store.missions) { if (!d || !d.sum || !d.sum.depart) continue; const x = d.sum, ret = x.retour || x.depart;
     const months = {}; let n = 0; for (let t = new Date(x.depart + 'T12:00'); t <= new Date(ret + 'T12:00'); t.setDate(t.getDate() + 1)) { const k = t.toISOString().slice(0, 7); months[k] = (months[k] || 0) + 1; n++; }
     // rémunération à 0 € dans Heures Mission : on cherche pourquoi, et on l'estime si la mission a juste été enregistrée sans salaire
-    let exp = x.brut || 0, why0 = '', est = false;
+    let exp = x.brut || 0, why0 = '', est = false, live = null;
+    // même montant que la page Heures Mission : recalcul en direct (salaire = barème SETCa à la date de la mission)
+    if (d.days && Object.keys(d.days).length) { try { live = buildDoc(d, d).sum; } catch(e) {} if (live && live.brut > 0) exp = live.brut; }
+    const ref = barBrutAt(x.depart.slice(0, 7));
     if (!exp) { const H = hoursOf(d), part = d.params && d.params.paiement === 'partiel';
       if (!x.prestees && !x.hs) why0 = 'aucune heure encodée dans la mission';
       else if (!(x.hs > 0)) why0 = `pas d’heures sup : ${h2(x.prestees || 0)} h prestées pour ${h2(x.fn || 0)} h d’horaire normal`;
@@ -3800,7 +3806,7 @@ function misList(){
       else { let live = null; try { live = buildDoc(d, d).sum; } catch(e) {}
         if (live && live.brut > 0) { exp = live.brut; why0 = `la mission avait été enregistrée sans salaire brut dans le profil : montant recalculé comme dans Heures Mission (${eur(exp)}) — réenregistre la mission pour le garder`; }
         else { const b = brutMois(x.depart.slice(0, 7)).v, B = x.fn || 0; if (b > 0 && B > 0 && x.N) { exp = b * x.N / 30.4 / B * H.paid; est = true; why0 = `la mission a été enregistrée sans salaire brut (profil vide à ce moment-là) : montant estimé avec ${eur(b)} brut/mois`; } else why0 = 'salaire brut inconnu : complète le salaire dans le profil puis réenregistre la mission'; } } }
-    out.push({ id, d, name: (d.mission && d.mission.nom) || x.ville || x.pays || 'Mission', depart: x.depart, retour: ret, months, n: n || 1, exp, why0, est, tot: hoursOf(d).tot, hsExp: hoursOf(d).raw, paidC: hoursOf(d).paid, rec: hoursOf(d).rec, maj: hoursOf(d).maj }); }
+    out.push({ id, d, name: (d.mission && d.mission.nom) || x.ville || x.pays || 'Mission', depart: x.depart, retour: ret, months, n: n || 1, exp, why0, est, ref, tot: hoursOf(d).tot, hsExp: hoursOf(d).raw, paidC: hoursOf(d).paid, rec: hoursOf(d).rec, maj: hoursOf(d).maj }); }
   return out.sort((a, b) => b.depart.localeCompare(a.depart));
 }
 function gapCalc(){
@@ -3871,6 +3877,7 @@ function gapReport(m){
     ['Heures sup <small>A − B</small>', h2(raw) + ' h'], ['Coefficient', coef ? h2(coef) + (x.fn ? ` <small class="note">(1 + (${h2(x.prestees)} − ${h2(x.fn)}) / ${h2(x.fn)} = ${h2(1 + (x.prestees - x.fn) / x.fn)} + resp./séniorité)</small>` : '') : '—'], ['Heures sup × coefficient <small>l’horaire normal B est déjà payé dans ton salaire (0BAE)</small>', `${h2(raw)} × ${h2(coef)} = <b>${h2(m.maj)} h</b> à payer en plus`],
     ['Paiement', part ? 'partiel (une partie en récupération)' : 'intégral'], ['− heures en récup <small>après coef., pas payées sur la fiche</small>', h2(m.rec) + ' h'], ['= <b>heures payées en plus du salaire</b>', `<b>${h2(m.paidC)} h</b>`],
     [`→ <b>heures sup attendues sur la fiche</b> <small>prestées − horaire FN${part ? ', au prorata de la part payée' : ''}</small>`, `<b>${h2(m.hsExp)} h</b>${part && m.maj ? ` <small class="note">(${h2(raw)} × ${h2(m.paidC)} / ${h2(m.maj)})</small>` : ''}`],
+    ['Salaire de référence <small>barème SETCa à la date de la mission</small>', m.ref ? `${eur(m.ref.bar)} <small class="note">(barème du ${dFr(m.ref.g.date)} · catégorie ${esc(m.ref.classe)} · ${m.ref.ageTxt}${m.ref.regime !== 100 ? ' · ' + m.ref.regime + ' %' : ''})</small>` : `<span class="note">barème non disponible : brut du profil (${eur(num(st.perso.brut))})</span>`],
     ['<b>Rémunération mission brut</b> <small>calculée dans Heures Mission</small>', `<b>${eur(m.exp)}</b>${m.est ? ' <span class="mark">estimé</span>' : ''}${m.why0 ? `<br><small class="note">${m.why0}${m.est ? ' — ouvre la mission dans Heures Mission et réenregistre-la pour le montant exact' : ''}</small>` : ''}`]]);
   h += `<h4>2 · Ce que disent les fiches de paie</h4><p class="note">L’app cherche, sur toutes les fiches importées, les lignes « Mission » et « Heures sup. » dont la <b>période</b> tombe pendant la mission, plus les heures sup de la partie « Communication ».</p>`;
   for (const P of m.per) {
@@ -4031,22 +4038,31 @@ function parseGrille(items){
 }
 function grilleFor(mois){ const G = grilles(), d = (mois || '9999-12') + '-31'; let g = null; for (const x of G) if (x.date <= d) g = x; return g; }
 function ageAt(naiss, mois){ if (!naiss || !mois) return null; const [y, m] = naiss.split('-').map(Number), [Y, M] = mois.split('-').map(Number); return Y - y - (M < m ? 1 : 0); }
-function baremeOf(p){
-  const g = grilleFor(p.mois); if (!g) return { err: grilles().length ? `Pas de barème en vigueur en ${moisLbl(p.mois)} : charge le barème indexé applicable à ce mois-là (le plus ancien chargé date du ${dFr(grilles()[0].date)}).` : 'Aucun barème chargé.' };
-  const classe = (p.info && p.info.statut) || '', regime = +(st.perso.regime || 100), naiss = st.perso.naiss || '';
+/* barème d'un mois pour une catégorie : méthode SETCa (âge), régime du profil */
+function barAt(mois, classe){
+  const g = grilleFor(mois); if (!g) return { err: grilles().length ? `Pas de barème en vigueur en ${moisLbl(mois)} : charge le barème indexé applicable à ce mois-là (le plus ancien chargé date du ${dFr(grilles()[0].date)}).` : 'Aucun barème chargé.' };
+  const regime = +(st.perso.regime || 100), naiss = st.perso.naiss || '';
   if (!classe) return { err: 'Catégorie absente : réimporte cette fiche pour lire la catégorie de ton statut.' };
   if (!/^\d{4}-\d{2}/.test(naiss)) return { err: 'Indique ta date de naissance dans ton profil (page principale).' };
   const R = g.reg[100] || g.reg[Object.keys(g.reg).sort((a, b) => b - a)[0]], base100 = g.reg[100] ? 1 : +Object.keys(g.reg).sort((a, b) => b - a)[0] / 100;
   const ci = R.cls.indexOf(String(classe)); if (ci < 0) return { err: `Catégorie ${classe} absente du barème.` };
   const ages = Object.keys(R.ages).map(Number).sort((a, b) => a - b), lo = ages[0], hi = ages[ages.length - 1], cl = x => Math.min(Math.max(x, lo), hi);
   const at = x => R.ages[cl(x)][ci] / base100;
-  const [Y, M] = p.mois.split('-').map(Number), [y, m] = naiss.split('-').map(Number);
+  const [Y, M] = mois.split('-').map(Number), [y, m] = naiss.split('-').map(Number);
   // méthode SETCa FN : âge de base = année − année de naissance − 1 (borné 21-50)
   const a = cl(Y - y - 1); let full, how, ageTxt;
   if (+classe > 410) { const k = m >= M ? a : a + 1; full = at(k); ageTxt = `${cl(k)} ans`; how = `barème à ${cl(k)} ans`; }
   else { const n = 12 - m, b0 = at(a), b1 = at(a + 1); full = b0 + n * (b1 - b0) / 12; ageTxt = `${a} → ${cl(a + 1)} ans`;
     how = `${eur(b0)} (${a} ans) + ${n}/12 × (${eur(b1)} − ${eur(b0)})`; }
-  const bar = Math.round(full * regime) / 100;
+  return { g, classe, regime, ageTxt, how, bar: Math.round(full * regime) / 100 };
+}
+// salaire de référence d'une mission : barème du mois, catégorie de la fiche de ce mois (sinon la plus proche avant, sinon la plus ancienne)
+function barBrutAt(mois){ if (!grilles().length || !st.paies.length) return null;
+  const P = st.paies.filter(p => p.info && p.info.statut).sort((a, b) => a.mois.localeCompare(b.mois)); if (!P.length) return null;
+  const p = [...P].reverse().find(p => p.mois <= mois) || P[0], r = barAt(mois, p.info.statut); return r.err ? null : { ...r, mois, fiche: p.mois }; }
+function baremeOf(p){
+  const r0 = barAt(p.mois, (p.info && p.info.statut) || ''); if (r0.err) return r0;
+  const { g, classe, regime, ageTxt, how, bar } = r0;
   const recL = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'recup' && L.mt), recMt = recL.reduce((s, L) => s + L.mt, 0);   // 81LH : congé pris sur les heures sup, payé comme un jour presté → fait partie du salaire du mois
   const base = p.lines.filter(L => L.sec === 'brut' && pcat(L) === 'base').reduce((s, L) => s + (L.mt || 0), 0) + recMt;
   const flexL = p.comm.filter(L => /^red\.?\s*sal/.test(normTxt(L.label)) && L.mt), flex = -flexL.reduce((s, L) => s + L.mt, 0);
