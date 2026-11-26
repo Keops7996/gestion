@@ -444,6 +444,7 @@ details.card.fold:not([open])>summary{border-bottom:0}
 .recapgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:720px){.recapgrid{grid-template-columns:1fr}}.hist tr.tot td{border-top:2px solid var(--line)}
 .paiedrop label.keep{display:flex;flex-direction:row;gap:8px;align-items:flex-start;margin-top:8px;font-size:13px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--ink)}.paiedrop label.keep input{width:auto;flex:none;margin:2px 0 0;min-height:0}.keep small{display:inline}
 .recapgrid>.tablebox{min-width:0}.recapgrid table{min-width:0!important;width:100%}.pvbtn{padding:2px 8px;font-size:11px;margin-left:6px;vertical-align:1px}
+select.alloc{max-width:230px;padding:3px 6px;font-size:12px;min-height:0}.allocmt{display:inline-flex;gap:4px;align-items:center;font-size:12px;margin-top:4px}.allocmt input{width:90px;padding:3px 6px;font-size:12px;min-height:0}
 .ieset{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:0 0 6px;font-size:13px}.ieset label{display:flex;gap:6px;align-items:center}
 .paiet td{vertical-align:top}.paiet .pst{white-space:normal}
 .gapdet>td>.gaprep{width:0;min-width:100%;box-sizing:border-box}
@@ -3798,10 +3799,17 @@ function misList(){
   return out.sort((a, b) => b.depart.localeCompare(a.depart));
 }
 function gapCalc(){
-  const M = misList(), paid = {}, paidH = {}, expM = {}, src = {};
+  const M = misList(), paid = {}, paidH = {}, expM = {}, src = {}, byId = Object.fromEntries(M.map(m => [m.id, m])), man = {}, excl = [];
   const add = (k, o) => (src[k] = src[k] || []).push(o);
-  for (const p of st.paies) for (const L of paieCalc(p).mis) { const k = L.per || p.mois, c = pcat(L); paid[k] = (paid[k] || 0) + (L.mt || 0); paidH[k] = (paidH[k] || 0) + (L.h || 0);   // heures payées : lignes Mission (ex. indemnité de mission) et Heures sup.
-    add(k, { kind: 'line', fiche: p.mois, code: L.code, label: L.label, h: L.h, mt: L.mt || 0, cat: c, countH: !!L.h }); }
+  for (const p of st.paies) for (const L of paieCalc(p).mis) { const k = L.per || p.mois, c = pcat(L), ref = p.id + '|' + p.lines.indexOf(L), full = L.mt || 0;
+    // attribution manuelle : toute la ligne (ou une partie) à une mission choisie, ou « aucune mission » ; le reste suit la période
+    let mt = full, h = L.h || 0, part = 0; const tgt = L.mis && L.mis !== '-' ? byId[L.mis] : null;
+    if (L.mis === '-') { excl.push({ fiche: p.mois, code: L.code, label: L.label, mt: full, h, ref }); mt = 0; h = 0; part = full; }
+    else if (tgt) { part = L.misMt != null && Math.abs(L.misMt) < Math.abs(full) - 0.005 ? L.misMt : full; const fr = full ? part / full : 1;
+      (man[tgt.id] = man[tgt.id] || []).push({ fiche: p.mois, code: L.code, label: L.label, per: k, h: h * fr, mt: part, full, ref }); mt = full - part; h = h * (1 - fr); }
+    paid[k] = (paid[k] || 0) + mt; paidH[k] = (paidH[k] || 0) + h;   // heures payées : lignes Mission (ex. indemnité de mission) et Heures sup.
+    add(k, { kind: 'line', fiche: p.mois, code: L.code, label: L.label, h: L.h, mt: full, cat: c, countH: !!L.h, ref, alloc: tgt ? tgt.id : L.mis === '-' ? '-' : '', allocMt: part }); }
+  gapMis = M;
   { const com = {}; for (const p of st.paies) for (const L of p.comm) { const k = normTxt(L.label); if (L.h && L.per && /\bhs\b|suppl/.test(k) && !/non pay/.test(k)) { const kk = k + '|' + L.per; (com[kk] = com[kk] || []).push({ fiche: p.mois, label: L.label, h: L.h, per: L.per }); } }
     // la communication (ex. « HS avec réduction fiscale ») recompte des heures déjà payées : on ne l'utilise que si elle dépasse les lignes de paie
     for (const arr of Object.values(com)) { const best = arr.reduce((a, b) => b.h > a.h ? b : a); const k = best.per, lineH = paidH[k] || 0, use = best.h > lineH + 0.005;
@@ -3814,15 +3822,16 @@ function gapCalc(){
       const share = expM[k] ? m.exp * n / m.n / expM[k] : 1 / (others.length + 1); m.paid += (paid[k] || 0) * share;
       const hshare = hsM[k] ? m.hsExp * n / m.n / hsM[k] : share; m.paidH += (paidH[k] || 0) * hshare;
       m.per.push({ k, n, src: src[k] || [], paid: paid[k] || 0, paidH: paidH[k] || 0, share, hshare, others }); }
+    m.man = man[m.id] || []; if (m.man.length) { m.seen = true; m.paid += m.man.reduce((a, o) => a + o.mt, 0); m.paidH += m.man.reduce((a, o) => a + o.h, 0); }
     m.gap = m.paid - m.exp; m.dH = m.hsExp - m.paidH; m.tol = Math.max(5, m.exp * 0.02);
     m.age = (Date.now() - new Date(m.retour + 'T12:00')) / 864e5;
     m.st = !m.seen ? (m.age < 75 ? ['wa', 'En attente'] : ['ko', 'Non trouvé sur les fiches']) : Math.abs(m.gap) <= m.tol ? ['ok', 'OK'] : m.gap < 0 ? ['ko', 'Payé en moins'] : ['wa', 'Payé en plus'];
-    m.reg = m.seen && m.dH < -0.25 ? -m.dH : 0;           // surplus d'heures = heures sup régulières (hors mission)
+    m.reg = 0;           // surplus d'heures = heures sup régulières (hors mission)
     m.absH = 0; }   // contrôle simple : rémunération mission calculée dans Heures Mission ↔ lignes de mission des fiches (en euros)
   // missions qui partagent un mois : la fiche les paie ensemble → on vérifie aussi le total du groupe
   for (const m of M) { const G = new Set([m]); let grow = true; while (grow) { grow = false; for (const o of M) if (!G.has(o) && [...G].some(g => Object.keys(g.months).some(k => o.months[k]))) { G.add(o); grow = true; } }
     if (G.size < 2) continue; const ks = new Set([...G].flatMap(g => Object.keys(g.months)));
-    const gp = [...ks].reduce((a, k) => a + (paid[k] || 0), 0), ge = [...G].reduce((a, g) => a + g.exp, 0), tol = Math.max(5, ge * 0.02);
+    const gp = [...ks].reduce((a, k) => a + (paid[k] || 0), 0) + [...G].reduce((a, g) => a + g.man.reduce((b, o) => b + o.mt, 0), 0), ge = [...G].reduce((a, g) => a + g.exp, 0), tol = Math.max(5, ge * 0.02);
     m.grp = { others: [...G].filter(g => g !== m), paid: gp, exp: ge, gap: gp - ge, tol, ok: [...G].every(g => g.seen) && Math.abs(gp - ge) <= tol };
     if (m.grp.ok && m.st[0] !== 'ok' && Math.abs(m.gap) > m.tol) m.st = ['ok', `OK avec ${m.grp.others.map(g => g.name).join(', ')}`]; }
   // lignes de paiement juste après la mission, sur un mois sans mission (rattrapage ?)
@@ -3830,8 +3839,19 @@ function gapCalc(){
     for (let i = 1; i <= 2; i++) { const [y, mo] = last.split('-').map(Number), d = new Date(y, mo - 1 + i, 1), k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (!M.some(o => o.months[k]) && Math.abs(paid[k] || 0) > 0.005) m.near.push({ k, mt: paid[k], src: src[k] || [] }); } }
   const orph = Object.keys(paid).filter(k => !M.some(m => m.months[k]) && Math.abs(paid[k]) > 0.005).sort().reverse().map(k => ({ k, mt: paid[k] }));
-  return { M, orph };
+  return { M, orph, excl };
 }
+let gapMis = [];
+function allocSel(o){ if (!o.ref) return '';
+  const opts = [['', 'Auto (selon la période)'], ...gapMis.slice().sort((a, b) => a.depart.localeCompare(b.depart)).map(m => [m.id, `${m.name} · ${dFr(m.depart)}`]), ['-', 'Aucune mission (heures sup régulières)']];
+  return `<select class="alloc" data-alloc="${esc(o.ref)}" aria-label="Attribuer la ligne à une mission">${opts.map(([v, t]) => `<option value="${esc(v)}"${v === (o.alloc || '') ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`
+    + (o.alloc && o.alloc !== '-' ? ` <label class="allocmt">montant <input type="number" step="0.01" data-allocmt="${esc(o.ref)}" value="${(+o.allocMt).toFixed(2)}" aria-label="Montant attribué"></label>` : ''); }
+function lineOfRef(ref){ const [pid, i] = ref.split('|'), p = st.paies.find(x => x.id === pid); return p && p.lines[+i]; }
+$('#paieGap').addEventListener('change', e => { const sl = e.target.closest('[data-alloc]'), im = e.target.closest('[data-allocmt]');
+  if (sl) { const L = lineOfRef(sl.dataset.alloc); if (!L) return; if (sl.value) L.mis = sl.value; else delete L.mis; delete L.misMt; }
+  else if (im) { const L = lineOfRef(im.dataset.allocmt); if (!L) return; const v = num(im.value); if (!v || Math.abs(v) >= Math.abs(L.mt || 0) - 0.005) delete L.misMt; else L.misMt = v; }
+  else return;
+  Store.saveProfil(); renderPAIE(); saveState('Attribution enregistrée'); });
 const gapOpen = new Set();
 function gapReport(m){
   const x = m.d.sum, part = m.d.params && m.d.params.paiement === 'partiel', raw = x.hs || 0, coef = x.coef || 0, near = (a, b) => Math.abs(a - b) <= 0.25;
@@ -3850,14 +3870,16 @@ function gapReport(m){
   h += `<h4>2 · Ce que disent les fiches de paie</h4><p class="note">L’app cherche, sur toutes les fiches importées, les lignes « Mission » et « Heures sup. » dont la <b>période</b> tombe pendant la mission, plus les heures sup de la partie « Communication ».</p>`;
   for (const P of m.per) {
     h += `<div class="pmis"><h5>${moisCap(P.k)} <small class="note">(${P.n} j de mission)</small></h5>`;
-    h += P.src.length ? `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Fiche</th><th>Ligne</th><th class="num">Heures</th><th class="num">Montant</th><th>Compté</th></tr></thead><tbody>${P.src.map(o => `<tr><td>${moisLbl(o.fiche)}</td><td>${esc(o.label)}${o.kind === 'comm' ? ' <small class="note">(communication)</small>' : ''}</td><td class="num">${o.h != null ? h2(o.h) : ''}</td><td class="num">${o.mt ? eur(o.mt) : '—'}</td><td>${o.dup ? '<span class="note">non (doublon d’une autre fiche)</span>' : o.info ? '<span class="note">info (déjà compté dans les lignes de paie)</span>' : [o.mt ? 'montant' : '', o.countH && o.h ? 'heures' : ''].filter(Boolean).join(' + ') || '<span class="note">montant</span>'}</td></tr>`).join('')}</tbody></table></div>`
+    h += P.src.length ? `<div class="tablebox"><table class="hist paiet"><thead><tr><th>Fiche</th><th>Ligne</th><th class="num">Heures</th><th class="num">Montant</th><th>Compté</th><th>Attribuer à</th></tr></thead><tbody>${P.src.map(o => `<tr><td>${moisLbl(o.fiche)}</td><td>${esc(o.label)}${o.kind === 'comm' ? ' <small class="note">(communication)</small>' : ''}</td><td class="num">${o.h != null ? h2(o.h) : ''}</td><td class="num">${o.mt ? eur(o.mt) : '—'}</td><td>${o.dup ? '<span class="note">non (doublon d’une autre fiche)</span>' : o.info ? '<span class="note">info (déjà compté dans les lignes de paie)</span>' : o.alloc === '-' ? '<span class="note">non (aucune mission)</span>' : o.alloc && Math.abs(o.allocMt - o.mt) < 0.005 ? `<span class="note">attribuée à « ${esc((gapMis.find(g => g.id === o.alloc) || {}).name || '')} »</span>` : (o.alloc ? `reste ${eur(o.mt - o.allocMt)} selon la période · ` : '') + ([o.mt ? 'montant' : '', o.countH && o.h ? 'heures' : ''].filter(Boolean).join(' + ') || '<span class="note">montant</span>')}</td><td>${o.kind === 'line' ? allocSel(o) : ''}</td></tr>`).join('')}</tbody></table></div>`
       : `<p class="note pneg" style="margin:4px 0">Aucune ligne trouvée pour cette période${m.age < 75 ? ' (normal si la fiche du mois suivant n’est pas encore là)' : ' : la fiche qui la paie n’est peut-être pas importée'}.</p>`;
     h += `<p class="note" style="margin:6px 0 0">Total ${moisLbl(P.k)} : ${eur(P.paid)} · ${h2(P.paidH)} h`;
     if (P.others.length) h += ` — partagé avec ${P.others.map(o => `« ${esc(o.name)} »`).join(', ')} : part de cette mission = ${pct(P.share)} des montants et ${pct(P.hshare)} des heures (au prorata de l’attendu)`;
     h += `.</p></div>`; }
+  if (m.man.length) h += `<div class="pmis"><h5>Attribuées à la main à cette mission</h5><div class="tablebox"><table class="hist paiet"><thead><tr><th>Fiche</th><th>Ligne</th><th class="num">Montant</th><th>Attribuer à</th></tr></thead><tbody>${m.man.map(o => `<tr><td>${moisLbl(o.fiche)}</td><td>${esc(o.code)} ${esc(o.label)} <small class="note">(période ${moisLbl(o.per)})</small></td><td class="num">${eur(o.mt)}${Math.abs(o.mt - o.full) > 0.005 ? `<span class="sub">sur ${eur(o.full)}</span>` : ''}</td><td>${allocSel({ ref: o.ref, alloc: m.id, allocMt: o.mt })}</td></tr>`).join('')}</tbody></table></div></div>`;
+  h += `<p class="note" style="margin:6px 0 0">Une ligne paie une autre mission, ou des heures sup hors mission ? Choisis-la dans « Attribuer à » : le calcul se met à jour (montant partiel possible, le reste suit la période).</p>`;
   h += `<h4>3 · La comparaison</h4>` + dl([
     ['Rémunération mission brut <small>Heures Mission</small>', `<b>${eur(m.exp)}</b>`],
-    ['Payé brut sur les fiches <small>lignes « Mission » et « Heures sup. »</small>', `${m.per.length > 1 ? m.per.map(P => eur(P.paid * P.share)).join(' + ') + ' = ' : ''}<b>${eur(m.paid)}</b>`],
+    ['Payé brut sur les fiches <small>lignes « Mission » et « Heures sup. »</small>', `${m.per.length > 1 || m.man.length ? [...m.per.map(P => eur(P.paid * P.share)), ...m.man.map(o => eur(o.mt) + ' <small>(à la main)</small>')].join(' + ') + ' = ' : ''}<b>${eur(m.paid)}</b>`],
     ['Écart brut <small>payé − attendu</small>', `${sgn(m.gap, false)} <small class="note">(tolérance ± ${eur(m.tol)})</small>`],
     ['<small>Pour info : heures sup sur les fiches / attendues</small>', `<small>${h2(m.paidH)} h / ${h2(m.hsExp)} h</small>`]]);
   const why = [];
@@ -3880,6 +3902,8 @@ function gapReport(m){
       why.unshift(G.ok ? `<b>Pas de manque réel.</b> Cette mission partage un mois avec ${nm} : la fiche paie les missions ensemble, l’app ne peut que <b>estimer</b> la part de chacune (au prorata de l’attendu). Au total, les fiches paient ${eur(G.paid)} pour ${eur(G.exp)} attendus : c’est correct (écart ${eur(G.gap)}).`
         : `Cette mission partage un mois avec ${nm} : la part de chaque mission n’est qu’une estimation (au prorata de l’attendu). Au total pour ces missions, les fiches paient ${eur(G.paid)} pour ${eur(G.exp)} attendus (écart ${sgn(G.gap, false)}).`); }
     if (m.gap < -m.tol) { const tot = m.per.reduce((a, P) => a + P.paid, 0), cut = m.per.filter(P => P.share < 0.999 && P.paid);
+      const moved = m.per.flatMap(P => P.src.filter(o => o.alloc && o.alloc !== m.id && o.allocMt));
+      if (moved.length) why.push(`Attribué à la main ailleurs : ${moved.map(o => `${esc(o.label)} ${eur(o.allocMt)} → ${o.alloc === '-' ? 'aucune mission' : `« ${esc((gapMis.find(g => g.id === o.alloc) || {}).name || '')} »`}`).join(', ')}.`);
       if (cut.length) why.push(`D’où viennent les ${eur(-m.gap)} : les lignes trouvées pour ${m.per.length > 1 ? 'ces mois' : 'ce mois'} totalisent ${eur(tot)}, mais ${cut.map(P => `pour ${moisLbl(P.k)} seuls ${pct(P.share)} (${eur(P.paid * P.share)} sur ${eur(P.paid)}) sont comptés ici, le reste est attribué à ${P.others.map(o => `« ${esc(o.name)} »`).join(', ')}`).join(' ; ')}.`);
       if (m.near.length) { const nt = m.near.reduce((a, o) => a + o.mt, 0); why.push(`Des lignes de mission existent juste après, sur ${m.near.map(o => `${moisLbl(o.k)} (${eur(o.mt)} : ${o.src.filter(x => x.kind === 'line').map(x => esc(x.code + ' ' + x.label)).join(', ')})`).join(', ')}, un mois sans mission encodée : elles ne sont pas comptées. Si elles paient cette mission (rattrapage), le total devient ${eur(m.paid + nt)} pour ${eur(m.exp)} attendus${Math.abs(m.paid + nt - m.exp) <= m.tol ? ' : c’est correct' : ''}. Vérifie la période indiquée sur la fiche.`); }
       if (!cut.length && !m.near.length && Math.abs(tot - m.paid) < 0.01) why.push(`D’où viennent les ${eur(-m.gap)} : toutes les lignes trouvées (${eur(tot)}) sont comptées pour cette mission. Le manque vient donc d’une ligne absente (fiche non importée, ligne classée « Autre » / « Salaire ») ou d’un attendu différent : compare la « rémunération mission brut » d’Heures Mission (${eur(m.exp)}) avec ce que tu attends.`); }
