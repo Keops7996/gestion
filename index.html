@@ -933,6 +933,7 @@ details.card.fold:not([open])>summary{border-bottom:0}
           <div class="f"><label for="u_dept">Département</label><input id="u_dept" data-b="perso.dept"></div>
           <div class="f"><label for="u_naiss">Date de naissance</label><input type="date" id="u_naiss" data-b="perso.naiss"></div>
           <div class="f"><label for="u_regime">Régime de travail</label><select id="u_regime" data-b="perso.regime"><option value="100">Temps plein</option><option value="90">9/10e</option><option value="80">4/5e</option><option value="50">Mi-temps</option></select></div>
+          <div class="f"><label for="u_hebdo">Horaire hebdomadaire <span class="hint">h/semaine</span></label><input type="number" id="u_hebdo" data-b="perso.hebdo" min="1" max="60" step="0.5" placeholder="36"></div>
           <div class="f"><label for="u_hscap">Contingent HS fiscal <span class="hint">h/an</span></label><input type="number" id="u_hscap" data-b="perso.hscap" min="0" step="1"></div>
           <div class="f"><label for="u_brut">Brut mensuel (€)</label><input type="number" step="0.01" id="u_brut" data-b="perso.brut"></div>
           <div class="f"><span class="lbl">Responsabilité par défaut (+0,10)</span><div class="seg" data-seg="perso.resp"><button type="button" data-v="1">Oui</button><button type="button" data-v="0">Non</button></div></div>
@@ -1425,7 +1426,7 @@ const rd = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } 
 const wr = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} };
 
 const emptyMission = () => ({nom:'', risque:false, depart:'', retour:'', pays:'', ville:'', ar800:'OUI', client:'', nature:'', ov:'', cf:'', cfLabel:'', demande:''});
-const PROFIL_DEFAULT = { perso: {...DATA.defaults.perso, resp:true, senior:true, regime:'100', naiss:'', hscap:'180'}, sign: {resp:'', dir:'', drh:'', rcm:''} };
+const PROFIL_DEFAULT = { perso: {...DATA.defaults.perso, resp:true, senior:true, regime:'100', naiss:'', hscap:'180', hebdo:'36'}, sign: {resp:'', dir:'', drh:'', rcm:''} };
 
 // reprise des anciennes versions
 const old = rd(KEY_OLD);
@@ -3750,13 +3751,15 @@ const isExc = L => /gratification|prime|bonus|pecule|13e|treizieme|fin d.annee|p
 const isAbs = L => L.code === '846H' || /absence|raisons? famil|imperieu|petit chomage|evenement famil|sans solde|conge non|non remun|maladie|chomage|greve|accident|incapacit/.test(normTxt(L.label));
 /* --- jours et heures du mois (partie « Communication ») --- */
 const ouvrM = k => { const [y, m] = k.split('-').map(Number); let n = 0; for (let d = 1, N = new Date(y, m, 0).getDate(); d <= N; d++) { const w = new Date(y, m - 1, d).getDay(); if (w && w < 6) n++; } return n; };
-const hJour = () => num(st.perso.hebdo || 38) / 5;
+const hJour = () => (num(st.perso.hebdo) || 36) / 5;   // régime FN : 36 h/semaine par défaut (modifiable dans le profil)
+// heures théoriques du mois selon l'horaire FN (lundi 8 h, mardi → vendredi 7 h = 36 h), ajusté si le profil indique un autre horaire hebdomadaire
+const hthM = k => { const [y, m] = k.split('-').map(Number), sc = (num(st.perso.hebdo) || 36) / 36; let h = 0; for (let d = 1, N = new Date(y, m, 0).getDate(); d <= N; d++) { const w = new Date(y, m - 1, d).getDay(); h += FN_HOURS[w || 7] || 0; } return h * sc; };
 function joursOf(k){   // k = mois « aaaa-mm » ; cherche sur toutes les fiches les lignes de communication de cette période
   const find = re => { for (const p of [...st.paies].sort((a, b) => b.mois.localeCompare(a.mois))) for (const L of p.comm) if (re.test(normTxt(L.label)) && (L.per ? L.per === k : p.mois === k)) { const v = L.j ?? L.h ?? L.mt; if (v != null) return { v, fiche: p.mois }; } return null; };
   const jp = find(/^(jrs|jours?) prest/), ja = find(/assimil/), ho = find(/heures? ouvr/), ouv = ouvrM(k), hj = hJour();
   const abs = []; for (const p of st.paies) for (const L of p.lines.concat(p.comm)) if (isAbs(L) && (L.per ? L.per === k : p.mois === k) && (L.h || L.j || L.mt)) abs.push({ ...L, fiche: p.mois, comm: p.comm.includes(L) });
   const absH = abs.filter(L => !L.comm || !abs.some(o => !o.comm && normTxt(o.label) === normTxt(L.label))).reduce((s, L) => s + (L.h || (L.j || 0) * hj), 0);
-  return { k, jp, ja, ho, ouv, hj, hth: ouv * hj, abs, absH };
+  return { k, jp, ja, ho, ouv, hj, hth: hthM(k), abs, absH };
 }
 const isPrec = L => L.code === '/410' || /precompte/.test(normTxt(L.label));
 const isOnss = L => L.code === '/300' || /cotisation onss/.test(normTxt(L.label));
@@ -3802,8 +3805,10 @@ function gapCalc(){
     m.age = (Date.now() - new Date(m.retour + 'T12:00')) / 864e5;
     m.st = !m.seen ? (m.age < 75 ? ['wa', 'En attente'] : ['ko', 'Non trouvé sur les fiches']) : Math.abs(m.gap) <= m.tol ? ['ok', 'OK'] : m.gap < 0 ? ['ko', 'Payé en moins'] : ['wa', 'Payé en plus'];
     m.reg = m.seen && m.dH < -0.25 ? -m.dH : 0;           // surplus d'heures = heures sup régulières (hors mission)
-    m.J = m.per.map(P => joursOf(P.k)); m.absH = m.J.reduce((s, J, i) => s + J.absH * m.per[i].hshare, 0);
-    if (m.seen && m.hsExp && m.dH > 0.25) m.st = m.absH && m.dH - m.absH <= 0.25 ? ['wa', `Écart expliqué par ${h2(m.absH)} h d’absence`] : ['ko', `${h2(m.dH)} h sup de mission manquantes`];
+    m.J = m.per.map(P => joursOf(P.k));
+    // heures non prestées du mois : absences (ex. 846H) ou heures ouvrées sous l'horaire FN ; les heures sup les compensent d'abord
+    m.absH = m.J.reduce((s, J, i) => s + Math.max(J.absH, J.ho ? Math.max(0, J.hth - J.ho.v) : 0) * m.per[i].hshare, 0);
+    if (m.seen && m.hsExp && m.dH > 0.25) m.st = m.absH && m.dH - m.absH <= 0.25 ? ['wa', `Écart expliqué : ${h2(m.absH)} h non prestées à l’horaire`] : ['ko', `${h2(m.dH)} h sup de mission manquantes`];
     else if (m.reg) m.st = m.st[0] === 'ok' ? ['ok', `OK · + ${h2(m.reg)} h sup régulières`] : m.gap > 0 ? ['wa', `Payé en plus · ${h2(m.reg)} h sup régulières ?`] : [m.st[0], `${m.st[1]} · + ${h2(m.reg)} h sup régulières`]; }
   const orph = Object.keys(paid).filter(k => !M.some(m => m.months[k]) && Math.abs(paid[k]) > 0.005).sort().reverse().map(k => ({ k, mt: paid[k] }));
   return { M, orph };
@@ -3849,9 +3854,10 @@ function gapReport(m){
         if (m.gap > m.tol) why.push(`Le brut payé en plus (${eur(m.gap)}) peut correspondre au paiement de ces ${h2(m.reg)} h régulières s’il est sur la même ligne que la mission.`);
         if (near(m.paidH, m.paidC)) why.push(`${h2(m.paidH)} h = tes heures payées après coefficient (${h2(m.paidC)} h) : la fiche compte les heures × coefficient, pas seulement les heures au-delà de l’horaire FN.`);
         else if (m.rec && near(m.paidH, raw)) why.push(`${h2(m.paidH)} h = toutes tes heures au-delà de l’horaire FN (${h2(raw)} h) : la fiche paie aussi la part mise en récupération.`); }
-      else if (m.absH && m.dH - m.absH <= 0.25) why.push(`Il manque ${h2(m.dH)} h sup, mais tu as ${h2(m.absH)} h d’absence le même mois (${m.J.flatMap(J => J.abs).map(L => esc(L.code ? L.code + ' ' + L.label : L.label)).filter((v, i, a) => a.indexOf(v) === i).join(', ')}) : les heures sup de mission ont d’abord compensé ces heures non prestées. Ce n’est probablement pas une erreur ; vérifie-le avec les RH si besoin.`);
-      else { why.push(`<b>Anomalie :</b> les fiches doivent contenir au minimum les ${h2(m.hsExp)} h sup de la mission, or il en manque ${h2(m.dH)} h${m.absH ? ` (dont ${h2(m.absH)} h peuvent s’expliquer par une absence le même mois)` : ''}.`);
-        const dh = m.J.filter(J => J.ho && J.ho.v < J.hth - 0.25); if (dh.length) why.push(`Heures ouvrées sur la fiche : ${dh.map(J => `${moisLbl(J.k)} ${h2(J.ho.v)} h pour ${h2(J.hth)} h théoriques (${J.ouv} j × ${h2(J.hj)} h)`).join(', ')}. Si ce mois a eu des heures non prestées, les heures sup peuvent d’abord les compenser : à vérifier avec les RH.`); }
+      else if (m.absH && m.dH - m.absH <= 0.25) { const ab = m.J.flatMap(J => J.abs).map(L => esc(L.code ? L.code + ' ' + L.label : L.label)).filter((v, i, a) => a.indexOf(v) === i), ho = m.J.filter(J => J.ho && J.ho.v < J.hth - 0.25);
+        why.push(`Il manque ${h2(m.dH)} h sup, mais ${h2(m.absH)} h de l’horaire normal n’ont pas été prestées ce mois-là${ho.length ? ` (heures ouvrées : ${ho.map(J => `${moisLbl(J.k)} ${h2(J.ho.v)} h pour ${h2(J.hth)} h à l’horaire FN`).join(', ')})` : ''}${ab.length ? ` (absence : ${ab.join(', ')})` : ''}. Les heures sup de mission ont d’abord servi à compléter l’horaire normal : seul le reste est payé en heures sup. Ce n’est probablement pas une erreur ; vérifie-le avec les RH si besoin.`); }
+      else { why.push(`<b>Anomalie :</b> les fiches doivent contenir au minimum les ${h2(m.hsExp)} h sup de la mission, or il en manque ${h2(m.dH)} h${m.absH ? ` (dont ${h2(m.absH)} h peuvent s’expliquer par des heures non prestées le même mois)` : ''}.`);
+        const dh = m.J.filter(J => J.ho && J.ho.v < J.hth - 0.25); if (dh.length) why.push(`Heures ouvrées sur la fiche : ${dh.map(J => `${moisLbl(J.k)} ${h2(J.ho.v)} h pour ${h2(J.hth)} h théoriques (horaire FN)`).join(', ')}. Si ce mois a eu des heures non prestées, les heures sup peuvent d’abord les compenser : à vérifier avec les RH.`); }
       if (m.per.some(P => P.src.some(o => o.kind === 'comm' && o.countH))) why.push('Les heures viennent surtout de la ligne « HS avec réduction fiscale » de la communication : elle ne reprend que les heures qui ont droit à la réduction fiscale (contingent limité), pas forcément toutes les heures payées.');
       if (m.dH > 0 && Math.abs(m.gap) <= m.tol) why.push('Les euros concordent pourtant : vérifie si la fiche compte les heures autrement (sans coefficient, ou seulement celles avec réduction fiscale) avant de réclamer.'); }
     if (m.per.some(P => !P.src.length)) why.push('Une partie de la mission n’a aucune ligne sur les fiches : vérifie que toutes les fiches concernées sont importées.');
@@ -3864,7 +3870,7 @@ function joursDl(J){
   const r = [['Jours ouvrables du mois <small>lundi → vendredi</small>', `${J.ouv} j`],
     ['Jours prestés ou rémunérés', J.jp ? `<b>${h2(J.jp.v)} j</b>${J.jp.v < J.ouv - 0.01 ? ` <span class="mark">${h2(J.ouv - J.jp.v)} j non rémunérés</span>` : ''}` : '<span class="note">pas sur les fiches importées</span>'],
     ['Jours assimilés <small>maladie, chômage… payés par un autre organisme</small>', J.ja ? `${h2(J.ja.v)} j` : '—'],
-    ['Heures ouvrées', J.ho ? `${h2(J.ho.v)} h <small class="note">(théorique ${J.ouv} j × ${h2(J.hj)} h = ${h2(J.hth)} h${Math.abs(J.ho.v - J.hth) > 0.25 ? ` · écart ${h2(J.ho.v - J.hth)} h` : ''})</small>` : '—']];
+    ['Heures ouvrées', J.ho ? `${h2(J.ho.v)} h <small class="note">(théorique horaire FN ${h2(num(st.perso.hebdo) || 36)} h/sem. : ${h2(J.hth)} h${Math.abs(J.ho.v - J.hth) > 0.25 ? ` · écart ${h2(J.ho.v - J.hth)} h` : ''})</small>` : '—']];
   for (const L of J.abs) r.push([`<span class="mark">Absence</span> ${esc(L.code)} ${esc(L.label)}${L.comm ? ' <small>(communication)</small>' : ''}`, [L.h ? h2(L.h) + ' h' : '', L.j ? h2(L.j) + ' j' : '', L.mt ? eur(L.mt) : ''].filter(Boolean).join(' · ')]);
   return `<dl>${r.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
 }
@@ -4192,7 +4198,7 @@ function renderBrief(L, M, G){
     let t, sub = `${dFr(m.depart)} → ${dFr(m.retour)}`;
     if (!m.seen) { t = m.st[0] === 'ko' ? `${nm} : pas trouvée sur tes fiches` : `${nm} : en attente de la fiche de paie`; sub += m.st[0] === 'ko' ? ' · à signaler aux RH' : ' · elle apparaît en général sur la fiche du mois suivant'; }
     else if (m.st[0] === 'ok') { t = `${nm} : bien payée`; sub += m.reg ? ` · + ${h2(m.reg)} h sup régulières en plus` : ''; }
-    else if (m.dH > 0.25 && m.hsExp && m.absH && m.dH - m.absH <= 0.25) { t = `${nm} : ${h2(m.dH)} h sup compensées par ton absence`; sub += ` · ${h2(m.absH)} h d’absence le même mois, pas d’erreur probable${Math.abs(m.gap) > m.tol ? ` · écart ${eur(m.gap)} brut à vérifier` : ''}`; }
+    else if (m.dH > 0.25 && m.hsExp && m.absH && m.dH - m.absH <= 0.25) { t = `${nm} : ${h2(m.dH)} h sup ont complété ton horaire normal`; sub += ` · ${h2(m.absH)} h non prestées à l’horaire FN ce mois-là, pas d’erreur probable${Math.abs(m.gap) > m.tol ? ` · écart ${eur(m.gap)} brut à vérifier` : ''}`; }
     else if (m.dH > 0.25 && m.hsExp) { t = `${nm} : il manque ${h2(m.dH)} h sup sur tes fiches`; sub += ` · écart ${eur(m.gap)} brut · à signaler aux RH`; }
     else { t = m.gap < 0 ? `${nm} : payée ${eur(-m.gap)} en moins` : `${nm} : payée ${eur(m.gap)} en plus`; sub += m.gap < 0 ? ' · à signaler aux RH' : ' · vérifie avec les RH'; }
     if (m.rec) sub += ` · ${h2(m.rec)} h à récupérer`;
