@@ -446,7 +446,12 @@ details.card.fold:not([open])>summary{border-bottom:0}
 .recapgrid>.tablebox{min-width:0}.recapgrid table{min-width:0!important;width:100%}.pvbtn{padding:2px 8px;font-size:11px;margin-left:6px;vertical-align:1px}
 select.alloc{max-width:230px;padding:3px 6px;font-size:12px;min-height:0}.allocmt{display:inline-flex;gap:4px;align-items:center;font-size:12px;margin-top:4px}.allocmt input{width:90px;padding:3px 6px;font-size:12px;min-height:0}
 #recapBody dl.rows dd,#recapBody dl.rows dt{white-space:normal;min-width:0;overflow-wrap:anywhere}#recapBody dl.rows dd{text-align:right}
-.sacard{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;padding:16px;background:color-mix(in srgb,var(--ink) 4%,transparent);border-radius:12px}
+.sacard{display:flex;justify-content:safe center;padding:16px;background:color-mix(in srgb,var(--ink) 4%,transparent);border-radius:12px;overflow-x:auto}
+.saframe{position:relative;flex:none;padding:6mm;background:#fff;border:.35mm solid #051989;border-radius:3mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.saframe .fw{position:absolute;font:italic 600 7.5pt/1 Arial,Helvetica,sans-serif;color:#051989;white-space:nowrap;letter-spacing:.02em}
+.fw.t{top:1.8mm;left:50%;transform:translateX(-50%)}.fw.b{bottom:1.8mm;left:50%;transform:translateX(-50%)}
+.fw.l{left:1.8mm;top:50%;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center;margin-left:1.3mm;font-size:5.6pt}.fw.r{right:1.8mm;top:50%;transform:translate(50%,-50%) rotate(90deg);margin-right:1.3mm;font-size:5.6pt}
+.sapair{display:flex;border:.2mm solid #999}.sapair .idcard{border-radius:0;box-shadow:none}.sapair .idcard+.idcard{border-left:.25mm dashed #777}
 .idcard{width:85.6mm;height:54mm;flex:none;background:#fff;color:#111;border-radius:3mm;box-shadow:0 4px 14px -6px rgba(0,0,0,.45);overflow:hidden;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .cside{display:flex;flex-direction:column;height:100%}.chead{flex:none;background:#c8102e;color:#fff;font:700 7.5pt/1 Arial,sans-serif;letter-spacing:.04em;padding:1.6mm 2.6mm}.ver .chead{background:#051989}.chead i{font-weight:400;font-size:6pt;opacity:.85;margin-left:1mm}
 .cbody{flex:1;min-height:0;overflow:hidden;padding:1.4mm 2.6mm 1.6mm;font-size:7.2pt;line-height:1.22}.cname{font-weight:700;font-size:1.35em;margin-bottom:.4mm}
@@ -459,8 +464,8 @@ select.alloc{max-width:230px;padding:3px 6px;font-size:12px;min-height:0}.allocm
 .sawish{margin:18px 0 6px;padding:16px 18px;border:1.5px solid var(--navy);border-radius:14px;text-align:center;font-size:16px;font-weight:600;color:var(--navy);background:color-mix(in srgb,var(--navy) 6%,transparent)}
 @media print{.sawishp{margin:5mm 0 0;padding:3mm 4mm;border:.3mm solid #051989;border-radius:2mm;width:171.2mm;box-sizing:border-box;text-align:center;font:600 10pt Arial,sans-serif;color:#051989}}
 .saacts{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;justify-content:space-between;margin-top:12px}.saacts select{min-width:240px}
-@media (min-width:900px){.sacard .idcard{zoom:1.35}}
-@media print{body.printcard #printArea{font:inherit}.saprint{padding:0}.sapair{display:flex;width:171.2mm;border:.2mm solid #999}.sapair .idcard{border-radius:0;box-shadow:none;zoom:1!important}.sapair .idcard+.idcard{border-left:.25mm dashed #777}.sahelp{font:8pt Arial,sans-serif;color:#444;margin:4mm 0 0;max-width:171mm}body.printcard{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+@media print{body.printcard #printArea{font:inherit}.saprint{padding:0}.saprint .saframe{zoom:1!important;display:inline-block}.sahelp{font:8pt Arial,sans-serif;color:#444;margin:4mm 0 0;max-width:183mm}body.printcard{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 .ieset{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:0 0 6px;font-size:13px}.ieset label{display:flex;gap:6px;align-items:center}
 .paiet td{vertical-align:top}.paiet .pst{white-space:normal}
 .gapdet>td>.gaprep{width:0;min-width:100%;box-sizing:border-box}
@@ -879,7 +884,6 @@ select.alloc{max-width:230px;padding:3px 6px;font-size:12px;min-height:0}.allocm
       <div class="f"><label for="sa_mutn">Mutuelle</label><input id="sa_mutn" data-s="mutn" placeholder="" ></div><div class="f"><label for="sa_mutno">N° d’affiliation</label><input id="sa_mutno" data-s="mutno" placeholder="" ></div><div class="f"><label for="sa_hosp">Assurance hospitalisation</label><input id="sa_hosp" data-s="hosp" placeholder="nom · n° · téléphone" ></div>
       <div class="f"><label for="sa_ehic">Carte européenne (EHIC) · n°</label><input id="sa_ehic" data-s="ehic" placeholder="" ></div><div class="f"><label for="sa_ehicv">EHIC · valable jusqu’au</label><input id="sa_ehicv" data-s="ehicv" placeholder="jj/mm/aaaa" ></div>
       <div class="f"><label for="sa_medn">Médecin traitant</label><input id="sa_medn" data-s="medn" placeholder="" ></div><div class="f"><label for="sa_medt">Téléphone médecin</label><input id="sa_medt" data-s="medt" placeholder="" type="tel"></div></div></div></details>
-    <div class="sawish">On vous souhaite de ne jamais avoir besoin de cette carte</div>
   </div>
 
   <div class="page" data-page="exp" hidden>
@@ -4534,8 +4538,11 @@ function cardHTML(){
   return { rec, ver };
 }
 function fitCard(root){ for (const b of root.querySelectorAll('.cbody')) { let f = 7.2; b.style.fontSize = f + 'pt'; while (b.scrollHeight > b.clientHeight + 0.5 && f > 4.2) { f -= 0.2; b.style.fontSize = f.toFixed(1) + 'pt'; } b.classList.toggle('over', b.scrollHeight > b.clientHeight + 0.5); } }
-function renderCard(){ const c = cardHTML(); $('#saCard').innerHTML = `<div class="idcard">${c.rec}</div><div class="idcard">${c.ver}</div>`; fitCard($('#saCard'));
-  $('#saOver').hidden = !$('#saCard .cbody.over'); }
+const WISH = 'On vous souhaite de ne jamais avoir besoin de cette carte';
+function renderCard(){ const c = cardHTML(); $('#saCard').innerHTML = `<div class="saframe"><span class="fw t">${WISH}</span><span class="fw b">${WISH}</span><span class="fw l">${WISH}</span><span class="fw r">${WISH}</span><div class="sapair"><div class="idcard">${c.rec}</div><div class="idcard">${c.ver}</div></div></div>`; fitCard($('#saCard'));
+  $('#saOver').hidden = !$('#saCard .cbody.over');
+  const fr = $('#saCard .saframe'), av = $('#saCard').clientWidth - 32; if (fr && av > 0) fr.style.zoom = Math.min(1.25, av / fr.offsetWidth).toFixed(3); }   // aperçu à la largeur de l'écran (l'impression reste à taille réelle)
+window.addEventListener('resize', () => { if (step === 'sante') renderCard(); });
 document.querySelector('[data-page="sante"]').addEventListener('change', e => { const el = e.target; if (!el.dataset.vx) return; const S = sante(), V = S.vx = S.vx || {}, v = V[el.dataset.vx] = V[el.dataset.vx] || {}, k = el.dataset.vk;
   if (k === 'on') v.on = el.checked; else v[k] = el.value;
   if (k === 'date' && el.value) { const y = (VACCINS.find(x => x[0] === el.dataset.vx) || [])[2]; if (y && (!v.rap || v.rap <= el.value)) v.rap = addYears(el.value, y); }   // rappel proposé, modifiable
@@ -4549,7 +4556,7 @@ document.querySelector('[data-page="sante"]').addEventListener('input', e => { c
   Store.saveProfil(); renderCard(); });
 $('#saMis').addEventListener('change', e => { santeMis = e.target.value; renderSANTE(); });
 $('#saPrint').addEventListener('click', () => { renderCard(); const c = $('#saCard').innerHTML;
-  $('#printArea').innerHTML = `<div class="saprint"><div class="sapair">${c}</div><p class="sahelp">Découpe le long du cadre, plie au milieu (pointillés) et plastifie : format carte d’identité (85,6 × 54 mm). Imprimer à 100 % (taille réelle), sans « ajuster à la page ».</p><div class="sawishp">On vous souhaite de ne jamais avoir besoin de cette carte</div></div>`;
+  $('#printArea').innerHTML = `<div class="saprint">${c}<p class="sahelp">Découpe le long de la carte (trait gris), plie au milieu (pointillés) et plastifie : format carte d’identité (85,6 × 54 mm). Imprimer à 100 % (taille réelle), sans « ajuster à la page ».</p></div>`;
   document.body.classList.add('printing', 'printcard'); const off = () => { document.body.classList.remove('printing', 'printcard'); window.removeEventListener('afterprint', off); }; window.addEventListener('afterprint', off);
   setTimeout(() => { try { window.print(); } catch(e) { saveState('Impression bloquée ici : utilise le fichier ou le site en ligne.'); } setTimeout(off, 1500); }, 50); });
 $('#saProfil').addEventListener('click', () => { backTo = 'sante'; go(0); });
