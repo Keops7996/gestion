@@ -447,7 +447,7 @@ details.card.fold:not([open])>summary{border-bottom:0}
 select.alloc{max-width:230px;padding:3px 6px;font-size:12px;min-height:0}.allocmt{display:inline-flex;gap:4px;align-items:center;font-size:12px;margin-top:4px}.allocmt input{width:90px;padding:3px 6px;font-size:12px;min-height:0}
 #recapBody dl.rows dd,#recapBody dl.rows dt{white-space:normal;min-width:0;overflow-wrap:anywhere}#recapBody dl.rows dd{text-align:right}
 .sacard{display:flex;justify-content:safe center;padding:16px;background:color-mix(in srgb,var(--ink) 4%,transparent);border-radius:12px;overflow-x:auto}
-.saframe{position:relative;flex:none;padding:6mm;background:#fff;border:.35mm solid #051989;border-radius:3mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.saframe{position:relative;flex:none;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .saframe .fw{position:absolute;font:italic 600 7.5pt/1 Arial,Helvetica,sans-serif;color:#051989;white-space:nowrap;letter-spacing:.02em}
 .fw.t{top:1.8mm;left:50%;transform:translateX(-50%)}.fw.b{bottom:1.8mm;left:50%;transform:translateX(-50%)}
 .fw.l{left:1.8mm;top:50%;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center;margin-left:1.3mm;font-size:5.6pt}.fw.r{right:1.8mm;top:50%;transform:translate(50%,-50%) rotate(90deg);margin-right:1.3mm;font-size:5.6pt}
@@ -4538,8 +4538,7 @@ function cardHTML(){
   return { rec, ver };
 }
 function fitCard(root){ for (const b of root.querySelectorAll('.cbody')) { let f = 7.2; b.style.fontSize = f + 'pt'; while (b.scrollHeight > b.clientHeight + 0.5 && f > 4.2) { f -= 0.2; b.style.fontSize = f.toFixed(1) + 'pt'; } b.classList.toggle('over', b.scrollHeight > b.clientHeight + 0.5); } }
-const WISH = 'On vous souhaite de ne jamais avoir besoin de cette carte';
-function renderCard(){ const c = cardHTML(); $('#saCard').innerHTML = `<div class="saframe"><span class="fw t">${WISH}</span><span class="fw b">${WISH}</span><span class="fw l">${WISH}</span><span class="fw r">${WISH}</span><div class="sapair"><div class="idcard">${c.rec}</div><div class="idcard">${c.ver}</div></div></div>`; fitCard($('#saCard'));
+function renderCard(){ const c = cardHTML(); $('#saCard').innerHTML = `<div class="saframe"><div class="sapair"><div class="idcard">${c.rec}</div><div class="idcard">${c.ver}</div></div></div>`; fitCard($('#saCard'));
   $('#saOver').hidden = !$('#saCard .cbody.over');
   const fr = $('#saCard .saframe'), av = $('#saCard').clientWidth - 32; if (fr && av > 0) fr.style.zoom = Math.min(1.25, av / fr.offsetWidth).toFixed(3); }   // aperçu à la largeur de l'écran (l'impression reste à taille réelle)
 window.addEventListener('resize', () => { if (step === 'sante') renderCard(); });
