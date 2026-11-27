@@ -456,6 +456,8 @@ select.alloc{max-width:230px;padding:3px 6px;font-size:12px;min-height:0}.allocm
 .vxl{display:grid;gap:2px}.vxr{display:grid;grid-template-columns:minmax(200px,1.4fr) auto auto minmax(110px,1fr);gap:6px 14px;align-items:center;padding:6px 8px;border-radius:8px}.vxr.on{background:color-mix(in srgb,var(--navy) 7%,transparent)}
 .vxn{display:flex;gap:8px;align-items:center;font-weight:600;font-size:14px;cursor:pointer}.vxn input{width:auto;min-height:0;margin:0}.vxd{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--ink-2)}.vxd input{width:auto;padding:4px 6px;min-height:0;font-size:13px}.vxd input:disabled{opacity:.45}
 @media(max-width:720px){.vxr{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.vxn{grid-column:1/-1}.vxs{grid-column:1/-1}.vxd{flex-direction:column;align-items:stretch;min-width:0;gap:2px}.vxd input{width:100%;min-width:0}}
+.sawish{margin:18px 0 6px;padding:16px 18px;border:1.5px solid var(--navy);border-radius:14px;text-align:center;font-size:16px;font-weight:600;color:var(--navy);background:color-mix(in srgb,var(--navy) 6%,transparent)}
+@media print{.sawishp{margin:5mm 0 0;padding:3mm 4mm;border:.3mm solid #051989;border-radius:2mm;width:171.2mm;box-sizing:border-box;text-align:center;font:600 10pt Arial,sans-serif;color:#051989}}
 .saacts{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;justify-content:space-between;margin-top:12px}.saacts select{min-width:240px}
 @media (min-width:900px){.sacard .idcard{zoom:1.35}}
 @media print{body.printcard #printArea{font:inherit}.saprint{padding:0}.sapair{display:flex;width:171.2mm;border:.2mm solid #999}.sapair .idcard{border-radius:0;box-shadow:none;zoom:1!important}.sapair .idcard+.idcard{border-left:.25mm dashed #777}.sahelp{font:8pt Arial,sans-serif;color:#444;margin:4mm 0 0;max-width:171mm}body.printcard{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
@@ -877,6 +879,7 @@ select.alloc{max-width:230px;padding:3px 6px;font-size:12px;min-height:0}.allocm
       <div class="f"><label for="sa_mutn">Mutuelle</label><input id="sa_mutn" data-s="mutn" placeholder="" ></div><div class="f"><label for="sa_mutno">N° d’affiliation</label><input id="sa_mutno" data-s="mutno" placeholder="" ></div><div class="f"><label for="sa_hosp">Assurance hospitalisation</label><input id="sa_hosp" data-s="hosp" placeholder="nom · n° · téléphone" ></div>
       <div class="f"><label for="sa_ehic">Carte européenne (EHIC) · n°</label><input id="sa_ehic" data-s="ehic" placeholder="" ></div><div class="f"><label for="sa_ehicv">EHIC · valable jusqu’au</label><input id="sa_ehicv" data-s="ehicv" placeholder="jj/mm/aaaa" ></div>
       <div class="f"><label for="sa_medn">Médecin traitant</label><input id="sa_medn" data-s="medn" placeholder="" ></div><div class="f"><label for="sa_medt">Téléphone médecin</label><input id="sa_medt" data-s="medt" placeholder="" type="tel"></div></div></div></details>
+    <div class="sawish">On vous souhaite de ne jamais avoir besoin de cette carte</div>
   </div>
 
   <div class="page" data-page="exp" hidden>
@@ -4546,7 +4549,7 @@ document.querySelector('[data-page="sante"]').addEventListener('input', e => { c
   Store.saveProfil(); renderCard(); });
 $('#saMis').addEventListener('change', e => { santeMis = e.target.value; renderSANTE(); });
 $('#saPrint').addEventListener('click', () => { renderCard(); const c = $('#saCard').innerHTML;
-  $('#printArea').innerHTML = `<div class="saprint"><div class="sapair">${c}</div><p class="sahelp">Découpe le long du cadre, plie au milieu (pointillés) et plastifie : format carte d’identité (85,6 × 54 mm). Imprimer à 100 % (taille réelle), sans « ajuster à la page ».</p></div>`;
+  $('#printArea').innerHTML = `<div class="saprint"><div class="sapair">${c}</div><p class="sahelp">Découpe le long du cadre, plie au milieu (pointillés) et plastifie : format carte d’identité (85,6 × 54 mm). Imprimer à 100 % (taille réelle), sans « ajuster à la page ».</p><div class="sawishp">On vous souhaite de ne jamais avoir besoin de cette carte</div></div>`;
   document.body.classList.add('printing', 'printcard'); const off = () => { document.body.classList.remove('printing', 'printcard'); window.removeEventListener('afterprint', off); }; window.addEventListener('afterprint', off);
   setTimeout(() => { try { window.print(); } catch(e) { saveState('Impression bloquée ici : utilise le fichier ou le site en ligne.'); } setTimeout(off, 1500); }, 50); });
 $('#saProfil').addEventListener('click', () => { backTo = 'sante'; go(0); });
