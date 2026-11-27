@@ -453,6 +453,9 @@ select.alloc{max-width:230px;padding:3px 6px;font-size:12px;min-height:0}.allocm
 .crow{display:flex;flex-wrap:wrap;gap:0 2.4mm;align-items:baseline;margin-bottom:.6mm}.crow i,.ck i{font-style:normal;color:#666;font-weight:400;font-size:.82em}.cblood{margin-left:auto;font-weight:800;font-size:1.5em;color:#c8102e;border:.3mm solid #c8102e;border-radius:1mm;padding:0 1.2mm}
 .cl{display:flex;gap:1.6mm;border-top:.15mm solid #ddd;padding:.35mm 0}.ck{flex:none;width:21mm;font-weight:700;color:#333;font-size:.86em}.cv{flex:1;min-width:0;overflow-wrap:anywhere}.cl.alert .cv{color:#c8102e;font-weight:700}.cl.big .cv{font-weight:700}
 .cmis{margin-top:.6mm;border-top:.3mm solid #051989}.cmis .cl:first-child{border-top:0}
+.vxl{display:grid;gap:2px}.vxr{display:grid;grid-template-columns:minmax(200px,1.4fr) auto auto minmax(110px,1fr);gap:6px 14px;align-items:center;padding:6px 8px;border-radius:8px}.vxr.on{background:color-mix(in srgb,var(--navy) 7%,transparent)}
+.vxn{display:flex;gap:8px;align-items:center;font-weight:600;font-size:14px;cursor:pointer}.vxn input{width:auto;min-height:0;margin:0}.vxd{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--ink-2)}.vxd input{width:auto;padding:4px 6px;min-height:0;font-size:13px}.vxd input:disabled{opacity:.45}
+@media(max-width:720px){.vxr{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.vxn{grid-column:1/-1}.vxs{grid-column:1/-1}.vxd{flex-direction:column;align-items:stretch;min-width:0;gap:2px}.vxd input{width:100%;min-width:0}}
 .saacts{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;justify-content:space-between;margin-top:12px}.saacts select{min-width:240px}
 @media (min-width:900px){.sacard .idcard{zoom:1.35}}
 @media print{body.printcard #printArea{font:inherit}.saprint{padding:0}.sapair{display:flex;width:171.2mm;border:.2mm solid #999}.sapair .idcard{border-radius:0;box-shadow:none;zoom:1!important}.sapair .idcard+.idcard{border-left:.25mm dashed #777}.sahelp{font:8pt Arial,sans-serif;color:#444;margin:4mm 0 0;max-width:171mm}body.printcard{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
@@ -860,7 +863,12 @@ select.alloc{max-width:230px;padding:3px 6px;font-size:12px;min-height:0}.allocm
       <div class="f"><label for="sa_donneur">Don d’organes</label><select id="sa_donneur" data-s="donneur"><option value="">—</option><option>Oui / Yes</option><option>Non / No</option></select></div>
       <div class="f"><label for="sa_allergies">Allergies (médicaments, aliments…)</label><textarea id="sa_allergies" data-s="allergies" rows="2" placeholder="ex. pénicilline"></textarea></div><div class="f"><label for="sa_patho">Maladies / pathologies</label><textarea id="sa_patho" data-s="patho" rows="2" placeholder="ex. asthme, diabète"></textarea></div>
       <div class="f"><label for="sa_trait">Traitement en cours</label><textarea id="sa_trait" data-s="trait" rows="2" placeholder="médicament · dose"></textarea></div><div class="f"><label for="sa_disp">Dispositifs médicaux</label><input id="sa_disp" data-s="disp" placeholder="ex. pacemaker, lentilles" ></div>
-      <div class="f"><label for="sa_vacc">Vaccins</label><input id="sa_vacc" data-s="vacc" placeholder="ex. tétanos 2024, fièvre jaune 2022" ></div><div class="f"><label for="sa_notes">Autres remarques</label><input id="sa_notes" data-s="notes" placeholder="" ></div></div></div></details>
+      <div class="f"><label for="sa_notes">Autres remarques</label><input id="sa_notes" data-s="notes" placeholder="" ></div></div></div></details>
+    <details class="card fold" open><summary>Vaccins <span class="tag" id="saVxTag"></span></summary><div class="body">
+      <p class="warns" id="saVxWarn" hidden style="margin:0 0 8px"></p>
+      <p class="note" style="margin:0 0 8px">Coche tes vaccins et indique la date. Le rappel est proposé selon l’intervalle habituel ; corrige-le selon ton carnet ou l’avis du médecin.</p>
+      <div class="vxl" id="saVx"></div>
+      <div class="fields" style="margin-top:10px"><div class="f"><label for="sa_vacc">Autres vaccins</label><input id="sa_vacc" data-s="vacc" placeholder="ex. vaccin non repris dans la liste"></div></div></div></details>
     <details class="card fold" open><summary>Personnes à prévenir</summary><div class="body"><div class="fields">
       <div class="f"><label for="sa_c1n">Contact 1 · nom</label><input id="sa_c1n" data-s="c1n" placeholder="" ></div><div class="f"><label for="sa_c1l">Lien</label><input id="sa_c1l" data-s="c1l" placeholder="ex. épouse" ></div><div class="f"><label for="sa_c1t">Téléphone</label><input id="sa_c1t" data-s="c1t" placeholder="+32 …" type="tel"></div>
       <div class="f"><label for="sa_c2n">Contact 2 · nom</label><input id="sa_c2n" data-s="c2n" placeholder="" ></div><div class="f"><label for="sa_c2l">Lien</label><input id="sa_c2l" data-s="c2l" placeholder="" ></div><div class="f"><label for="sa_c2t">Téléphone</label><input id="sa_c2t" data-s="c2t" placeholder="+32 …" type="tel"></div></div></div></details>
@@ -4477,6 +4485,18 @@ applyPreset();
 const SANTE_F = ['nat','lang','groupe','allergies','patho','trait','disp','vacc','donneur','c1n','c1l','c1t','c2n','c2l','c2t','medn','medt','mutn','mutno','ehic','ehicv','assn','asst','assp','hosp','notes'];
 const sante = () => { st.perso.sante = st.perso.sante || {}; st.perso.sante.mis = st.perso.sante.mis || {}; return st.perso.sante; };
 let santeMis = '';
+const VACCINS = [['dtp','Tétanos – diphtérie (coqueluche)',10],['polio','Polio',10],['hepa','Hépatite A',0],['hepb','Hépatite B',0],['fj','Fièvre jaune',0],['typh','Typhoïde',3],['men','Méningite ACWY',5],['rage','Rage',0],['ej','Encéphalite japonaise',0],['tbe','Encéphalite à tiques',5],['chol','Choléra',2],['ror','Rougeole – oreillons – rubéole',0],['grippe','Grippe',1],['covid','COVID-19',1]];
+const addYears = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); return `${y + n}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`; };
+const vxList = () => { const S = sante(), V = S.vx || {}; return VACCINS.filter(([k]) => V[k] && V[k].on).map(([k, n]) => ({ k, n, ...V[k] })); };
+function renderVX(){ const V = sante().vx || {}, today = todayIso();
+  $('#saVx').innerHTML = VACCINS.map(([k, n, y]) => { const v = V[k] || {}, late = v.on && v.rap && v.rap < today, soon = v.on && v.rap && !late && v.rap <= (() => { const d = new Date(); d.setMonth(d.getMonth() + 3); return d.toISOString().slice(0, 10); })();
+    return `<div class="vxr${v.on ? ' on' : ''}"><label class="vxn"><input type="checkbox" data-vx="${k}" data-vk="on"${v.on ? ' checked' : ''}> ${n}</label>
+      <label class="vxd">Fait le <input type="date" data-vx="${k}" data-vk="date" value="${esc(v.date || '')}"${v.on ? '' : ' disabled'}></label>
+      <label class="vxd">Rappel <input type="date" data-vx="${k}" data-vk="rap" value="${esc(v.rap || '')}"${v.on ? '' : ' disabled'}></label>
+      <span class="vxs">${!v.on ? `<small class="note">${y ? 'rappel conseillé : ' + y + ' an' + (y > 1 ? 's' : '') : ''}</small>` : late ? '<span class="pst ko">rappel dépassé</span>' : soon ? '<span class="pst wa">rappel bientôt</span>' : v.rap ? '<span class="pst ok">à jour</span>' : '<small class="note">pas de rappel prévu</small>'}</span></div>`; }).join('');
+  const L = vxList().filter(v => v.rap && v.rap < today); $('#saVxWarn').hidden = !L.length; $('#saVxWarn').textContent = L.length ? `Rappel dépassé : ${L.map(v => `${v.n} (${dFr(v.rap)})`).join(', ')}.` : '';
+  $('#saVxTag').textContent = vxList().length ? `${vxList().length} coché${vxList().length > 1 ? 's' : ''}${L.length ? ` · ${L.length} rappel${L.length > 1 ? 's' : ''} dépassé${L.length > 1 ? 's' : ''}` : ''}` : ''; }
+
 function santeMissions(){ return [...allNamed().values()].map(x => { const h = x.h[0] && x.h[0].d, l = x.cl[0];
   const pays = (h && ((h.sum && h.sum.pays) || (h.mission && h.mission.pays))) || (l && destTags(l).map(d => d.label || d).join(', ')) || '';
   const dep = (h && h.sum && h.sum.depart) || (l && l.depart) || ''; return { key: x.key, name: x.name, pays, dep }; }).sort((a, b) => (b.dep || '').localeCompare(a.dep || '')); }
@@ -4488,7 +4508,7 @@ function renderSANTE(){
   $('#saMis').innerHTML = '<option value="">— Aucune (carte générale) —</option>' + M.map(m => `<option value="${esc(m.key)}"${m.key === santeMis ? ' selected' : ''}>${esc(m.name)}${m.pays ? ' · ' + esc(m.pays) : ''}${m.dep ? ' · ' + dFr(m.dep) : ''}</option>`).join('');
   const mi = santeMis ? (S.mis[santeMis] = S.mis[santeMis] || {}) : null; $('#saMisF').hidden = !mi;
   if (mi) { const m = M.find(x => x.key === santeMis); for (const k of ['pays','urg','amb','hop']) { const el = document.querySelector(`[data-sm="${k}"]`); if (document.activeElement !== el) el.value = mi[k] || (k === 'pays' && m ? m.pays : ''); } }
-  renderCard();
+  renderVX(); renderCard();
   const filled = SANTE_F.filter(k => S[k]).length; $('#appSanteStat') && ($('#appSanteStat').textContent = filled ? `${filled} info${filled > 1 ? 's' : ''} renseignée${filled > 1 ? 's' : ''}` : '');
 }
 function cardHTML(){
@@ -4498,7 +4518,7 @@ function cardHTML(){
   const rec = `<div class="cside rec"><div class="chead">✚ URGENCE MÉDICALE <i>MEDICAL EMERGENCY</i></div><div class="cbody">
     <div class="cname">${esc([P.prenom, (P.nom || '').toUpperCase()].filter(Boolean).join(' ') || '—')}</div>
     <div class="crow">${P.naiss ? `<span><b>${dFr(P.naiss)}</b> <i>DOB</i></span>` : ''}${S.nat ? `<span>${esc(S.nat)}</span>` : ''}${S.groupe ? `<span class="cblood">${esc(S.groupe)}</span>` : ''}</div>
-    ${L('Allergies', 'Allergies', S.allergies, 'alert')}${L('Pathologies', 'Conditions', S.patho)}${L('Traitement', 'Medication', S.trait)}${L('Dispositifs', 'Devices', S.disp)}${L('Vaccins', 'Vaccines', S.vacc)}
+    ${L('Allergies', 'Allergies', S.allergies, 'alert')}${L('Pathologies', 'Conditions', S.patho)}${L('Traitement', 'Medication', S.trait)}${L('Dispositifs', 'Devices', S.disp)}${L('Vaccins', 'Vaccines', [...vxList().map(v => v.n.replace(/ \(.*\)| – .*/, '') + (v.date ? ' ' + v.date.slice(0, 4) : '')), S.vacc].filter(Boolean).join(', '))}
     ${S.donneur ? L('Don d’organes', 'Organ donor', S.donneur) : ''}${L('Langues', 'Languages', S.lang)}${L('Remarques', 'Notes', S.notes)}
   </div></div>`;
   const ver = `<div class="cside ver"><div class="chead">☎ CONTACTS <i>IN CASE OF EMERGENCY</i></div><div class="cbody">
@@ -4513,7 +4533,13 @@ function cardHTML(){
 function fitCard(root){ for (const b of root.querySelectorAll('.cbody')) { let f = 7.2; b.style.fontSize = f + 'pt'; while (b.scrollHeight > b.clientHeight + 0.5 && f > 4.2) { f -= 0.2; b.style.fontSize = f.toFixed(1) + 'pt'; } b.classList.toggle('over', b.scrollHeight > b.clientHeight + 0.5); } }
 function renderCard(){ const c = cardHTML(); $('#saCard').innerHTML = `<div class="idcard">${c.rec}</div><div class="idcard">${c.ver}</div>`; fitCard($('#saCard'));
   $('#saOver').hidden = !$('#saCard .cbody.over'); }
+document.querySelector('[data-page="sante"]').addEventListener('change', e => { const el = e.target; if (!el.dataset.vx) return; const S = sante(), V = S.vx = S.vx || {}, v = V[el.dataset.vx] = V[el.dataset.vx] || {}, k = el.dataset.vk;
+  if (k === 'on') v.on = el.checked; else v[k] = el.value;
+  if (k === 'date' && el.value) { const y = (VACCINS.find(x => x[0] === el.dataset.vx) || [])[2]; if (y && (!v.rap || v.rap <= el.value)) v.rap = addYears(el.value, y); }   // rappel proposé, modifiable
+  if (!v.on && !v.date && !v.rap) delete V[el.dataset.vx];
+  Store.saveProfil(); renderVX(); renderCard(); });
 document.querySelector('[data-page="sante"]').addEventListener('input', e => { const el = e.target, S = sante();
+  if (el.dataset.vx) return;
   if (el.dataset.s) { const v = el.value.trim() ? el.value : ''; if (v) S[el.dataset.s] = v; else delete S[el.dataset.s]; }
   else if (el.dataset.sm && santeMis) { S.mis[santeMis] = S.mis[santeMis] || {}; S.mis[santeMis][el.dataset.sm] = el.value; }
   else return;
